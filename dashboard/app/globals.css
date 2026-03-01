@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+:root {
+  --cyan: #02f8c5;
+  --bg: #000000;
+  --border: #1a1a1a;
+  --dim: #555555;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--bg);
+  color: #ffffff;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background: var(--bg);
+}
+
+/* ── Blinking cursor ── */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+.cursor::after {
+  content: '_';
+  color: var(--cyan);
+  animation: blink 1s step-end infinite;
+  margin-left: 2px;
+}
+
+/* ── Process step rows ── */
+.process-row {
+  opacity: 0.35;
+  border-left: 2px solid transparent;
+  padding-left: 1.25rem;
+  transition: opacity 180ms ease, border-color 180ms ease;
+}
+
+.process-row:hover {
+  opacity: 1;
+  border-left-color: var(--cyan);
+}
+
+/* ── Neon glow on accent text ── */
+.glow {
+  text-shadow: 0 0 18px var(--cyan), 0 0 50px var(--cyan);
+}
+
+/* ── Subtle scanline on hero headline ── */
+@keyframes scanline {
+  0%   { background-position: 0 0; }
+  100% { background-position: 0 4px; }
+}
+
+/* ── Agent card hover ── */
+.agent-card {
+  border: 1px solid var(--border);
+  transition: border-color 180ms ease;
+}
+
+.agent-card:hover {
+  border-color: #2a2a2a;
+}
+
+/* ── Nav link hover ── */
+.nav-link {
+  color: var(--dim);
+  transition: color 150ms ease;
+  letter-spacing: 0.08em;
+}
+
+.nav-link:hover {
+  color: #ffffff;
+}
+
+/* ── Monospace data values ── */
+.data {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.75rem;
+}
+
+/* ── Agent card "VIEW CARD" link ── */
+.card-link {
+  color: #444;
+  transition: color 150ms ease;
+}
+
+.card-link:hover {
+  color: #02f8c5;
+}

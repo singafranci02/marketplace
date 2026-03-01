@@ -1,0 +1,32 @@
+# Node
+node_modules/
+.next/
+dist/
+*.log
+npm-debug.log*
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Runtime files (generated at runtime — not source)
+negotiation_log.jsonl
+artifacts.json
+
+# Env
+.env
+.env.local
+.env*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+node_modules
