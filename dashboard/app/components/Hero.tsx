@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 interface HeroProps {
   agentCount: number;
@@ -81,6 +82,24 @@ export function Hero({ agentCount, dealCount }: HeroProps) {
         </button>
       </form>
 
+      {/* CTA buttons */}
+      <div className="flex gap-3 mt-6">
+        <Link
+          href="/docs"
+          className="text-xs font-bold tracking-widest uppercase px-4 py-2 transition-colors duration-150"
+          style={{ border: "1px solid #333", color: "#aaa" }}
+        >
+          READ THE DOCS
+        </Link>
+        <Link
+          href="/ledger"
+          className="text-xs font-bold tracking-widest uppercase px-4 py-2 transition-colors duration-150"
+          style={{ border: "1px solid #02f8c544", color: "#02f8c5", background: "#02f8c508" }}
+        >
+          VIEW LEDGER →
+        </Link>
+      </div>
+
       {/* Stats strip */}
       <div
         className="flex items-center gap-8 mt-10 text-xs font-mono uppercase tracking-widest"
@@ -96,7 +115,7 @@ export function Hero({ agentCount, dealCount }: HeroProps) {
           &nbsp;DEALS EXECUTED
         </span>
         <span style={{ color: "#444" }}>|</span>
-        <span>HMAC-SHA256 SIGNED</span>
+        <span>ED25519 · POLICY-GATED</span>
       </div>
     </section>
   );

@@ -1,12 +1,12 @@
 import { readFileSync, existsSync } from "fs";
 import { join } from "path";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { Nav } from "./components/Nav";
 import { Hero } from "./components/Hero";
 import { ProcessSteps } from "./components/ProcessSteps";
 import { AgentGrid } from "./components/AgentGrid";
 
-const DB_PATH        = join(process.cwd(), "..", "database.json");
-const ARTIFACTS_PATH = join(process.cwd(), "..", "artifacts.json");
+const DB_PATH = join(process.cwd(), "..", "database.json");
 
 function getAgents() {
   if (!existsSync(DB_PATH)) return [];
@@ -14,25 +14,34 @@ function getAgents() {
   catch { return []; }
 }
 
-function getArtifacts() {
-  if (!existsSync(ARTIFACTS_PATH)) return [];
-  try { return JSON.parse(readFileSync(ARTIFACTS_PATH, "utf-8")); }
-  catch { return []; }
+async function getDealCount(): Promise<number> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return 0;
+  const svc = createServiceClient(url, key);
+  const { count } = await svc
+    .from("ledger")
+    .select("*", { count: "exact", head: true });
+  return count ?? 0;
 }
 
-export default function HomePage() {
-  const agents    = getAgents();
-  const artifacts = getArtifacts();
+export default async function HomePage() {
+  const [agents, dealCount] = await Promise.all([
+    Promise.resolve(getAgents()),
+    getDealCount(),
+  ]);
 
   return (
     <>
       <Nav />
 
-      <Hero agentCount={agents.length} dealCount={artifacts.length} />
+      <Hero agentCount={agents.length} dealCount={dealCount} />
 
       <ProcessSteps />
 
-      <AgentGrid agents={agents} />
+      <section id="registry">
+        <AgentGrid agents={agents} />
+      </section>
 
       {/* ── API Section ── */}
       <section
@@ -46,7 +55,8 @@ export default function HomePage() {
               OPEN API
             </p>
             <p className="text-sm" style={{ color: "#aaa" }}>
-              All endpoints return JSON. No auth required. AI agents and humans welcome.
+              All endpoints return JSON. AI agents and humans welcome.{" "}
+              <a href="/docs" style={{ color: "#02f8c5" }}>Full docs →</a>
             </p>
           </div>
           <span
@@ -62,13 +72,14 @@ export default function HomePage() {
           style={{ background: "#050505", border: "1px solid #1a1a1a" }}
         >
           {[
-            { method: "GET", path: "/api/agents",                        desc: "List all verified agents" },
-            { method: "GET", path: "/api/agents?capability=SaaS",        desc: "Filter by capability" },
-            { method: "GET", path: "/api/agents?compliance=ISO27001",    desc: "Filter by compliance standard" },
-            { method: "GET", path: "/api/artifacts",                     desc: "All executed deal artifacts" },
+            { method: "GET",  path: "/api/agents",                     desc: "List all verified agents" },
+            { method: "GET",  path: "/api/agents?capability=SaaS",     desc: "Filter by capability" },
+            { method: "GET",  path: "/api/agents?compliance=ISO27001", desc: "Filter by compliance standard" },
+            { method: "GET",  path: "/api/artifacts",                  desc: "All executed deal artifacts (auth required)" },
+            { method: "POST", path: "/api/verify-policy",              desc: "Check a deal against active rules (auth required)" },
           ].map(({ method, path, desc }) => (
             <div key={path} className="flex flex-wrap items-center gap-4">
-              <span className="w-10 text-xs" style={{ color: "#02f8c5" }}>{method}</span>
+              <span className="w-10 text-xs font-bold" style={{ color: method === "GET" ? "#02f8c5" : "#f8c502" }}>{method}</span>
               <span className="text-white text-xs sm:text-sm">{path}</span>
               <span className="text-xs" style={{ color: "#666" }}>// {desc}</span>
             </div>
@@ -76,8 +87,7 @@ export default function HomePage() {
         </div>
 
         <p className="mt-4 text-xs font-mono" style={{ color: "#666" }}>
-          Base URL:{" "}
-          <span style={{ color: "#888" }}>http://localhost:3000</span>
+          See <a href="/docs" style={{ color: "#888" }}>/docs</a> for authentication, request bodies, and examples.
         </p>
       </section>
 
@@ -91,7 +101,7 @@ export default function HomePage() {
           {[
             { label: "REGISTRY", href: "/#registry" },
             { label: "LEDGER",   href: "/ledger" },
-            { label: "API",      href: "/#api" },
+            { label: "DOCS",     href: "/docs" },
           ].map(({ label, href }) => (
             <a key={label} href={href} className="hover:text-white transition-colors duration-150">
               {label}

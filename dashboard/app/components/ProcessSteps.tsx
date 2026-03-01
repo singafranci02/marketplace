@@ -35,7 +35,7 @@ const steps = [
     num: "05",
     title: "EXECUTION",
     description:
-      "Signed Artifact: Both parties sign the final deal with HMAC-SHA256 over canonical JSON. The artifact is appended to the immutable Audit Ledger for CFO review.",
+      "Signed Artifact: Both parties sign the final deal with Ed25519 (per-agent private key). The Policy Engine verifies the artifact before signing is allowed. The signed record is written to the Supabase ledger with a SHA-256 chain hash — tamper-evident and permanent.",
     status: "LIVE",
     freq: "ATOMIC",
   },
