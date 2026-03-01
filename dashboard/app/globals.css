@@ -94,3 +94,13 @@ body {
 .card-link:hover {
   color: #02f8c5;
 }
+
+/* ── Realtime ledger: new row flash ── */
+@keyframes row-flash {
+  0%   { background: #02f8c518; }
+  100% { background: transparent; }
+}
+
+.row-new {
+  animation: row-flash 2s ease-out forwards;
+}

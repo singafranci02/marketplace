@@ -16,6 +16,7 @@ Every handshake is appended to negotiation_log.jsonl as an audit trail.
 """
 
 import json
+import os
 import uuid
 import base64
 import datetime
@@ -26,7 +27,14 @@ from pathlib import Path
 from typing import Literal
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-from cryptography.hazmat.primitives.serialization import load_pem_private_key
+from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
+from cryptography.hazmat.primitives.serialization import (
+    load_pem_private_key, load_pem_public_key,
+    Encoding, PublicFormat,
+)
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -46,6 +54,19 @@ SELLER_FLOOR_PRICE    = 380   # Minimum the seller will accept
 AUDIT_LOG_PATH    = Path(__file__).parent / "negotiation_log.jsonl"
 KEYS_DIR          = Path(__file__).parent / "agent-keys"
 _ENV_PATH         = Path(__file__).parent / ".env"
+
+# Maps agent_id → key file name for the ECDHE handshake
+_AGENT_KEY_MAP = {
+    BUYER_AGENT_ID:  "buyer-acmecorp",
+    SELLER_AGENT_ID: "sydney-saas",
+}
+
+
+def _agent_id_to_key_name(agent_id: str) -> str:
+    key = _AGENT_KEY_MAP.get(agent_id)
+    if not key:
+        raise ValueError(f"No key mapping for agent: {agent_id}")
+    return key
 
 # ---------------------------------------------------------------------------
 # A2A Message primitives
@@ -214,6 +235,98 @@ def _sign(canonical_body: bytes, key_name: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Encryption helpers (AES-256-GCM) and ECDHE handshake
+# ---------------------------------------------------------------------------
+
+def _load_ed25519_public_key(agent_id: str):
+    """Load Ed25519 public key PEM from database.json for the given agent_id."""
+    db_path = Path(__file__).parent / "database.json"
+    db = json.loads(db_path.read_text())
+    for agent in db.get("agents", []):
+        if agent["agent_id"] == agent_id:
+            return load_pem_public_key(agent["public_key"].encode())
+    raise ValueError(f"Public key not found for agent: {agent_id}")
+
+
+def _encrypt(payload: dict, session_key: bytes) -> dict:
+    """AES-256-GCM encrypt a dict payload. Returns an envelope dict."""
+    iv = os.urandom(12)  # 96-bit nonce (GCM standard)
+    aesgcm = AESGCM(session_key)
+    ciphertext = aesgcm.encrypt(iv, json.dumps(payload).encode(), None)
+    return {
+        "encrypted":  True,
+        "algorithm":  "AES-256-GCM",
+        "iv":         base64.urlsafe_b64encode(iv).decode(),
+        "ciphertext": base64.urlsafe_b64encode(ciphertext).decode(),
+    }
+
+
+def _decrypt(envelope: dict, session_key: bytes) -> dict:
+    """AES-256-GCM decrypt an envelope produced by _encrypt()."""
+    iv         = base64.urlsafe_b64decode(envelope["iv"])
+    ciphertext = base64.urlsafe_b64decode(envelope["ciphertext"])
+    aesgcm     = AESGCM(session_key)
+    return json.loads(aesgcm.decrypt(iv, ciphertext, None))
+
+
+def _perform_handshake(buyer_key_name: str, seller_agent_id: str) -> bytes:
+    """
+    Ephemeral X25519 key exchange authenticated with Ed25519 signing keys.
+    Returns a 32-byte AES-256 session key derived via HKDF-SHA256.
+    Key separation: Ed25519 keys sign; ephemeral X25519 keys do DH (forward secrecy).
+    """
+    print("\n[CRYPTO] ── Key Exchange ──────────────────────────────────────────")
+
+    # ── Buyer side ──────────────────────────────────────────────────────────
+    buyer_eph_priv  = X25519PrivateKey.generate()
+    buyer_eph_pub   = buyer_eph_priv.public_key()
+    buyer_pub_bytes = buyer_eph_pub.public_bytes(Encoding.Raw, PublicFormat.Raw)
+
+    buyer_ed25519_priv: Ed25519PrivateKey = load_pem_private_key(  # type: ignore
+        (KEYS_DIR / f"{buyer_key_name}.pem").read_bytes(), password=None
+    )
+    buyer_sig = buyer_ed25519_priv.sign(b"KEY_EXCHANGE:" + buyer_pub_bytes)
+    print(f"  [BUYER ] Ephemeral X25519 pub generated + signed with Ed25519")
+
+    # ── Seller side ──────────────────────────────────────────────────────────
+    seller_eph_priv  = X25519PrivateKey.generate()
+    seller_eph_pub   = seller_eph_priv.public_key()
+    seller_pub_bytes = seller_eph_pub.public_bytes(Encoding.Raw, PublicFormat.Raw)
+
+    seller_key_name     = _agent_id_to_key_name(seller_agent_id)
+    seller_ed25519_priv: Ed25519PrivateKey = load_pem_private_key(  # type: ignore
+        (KEYS_DIR / f"{seller_key_name}.pem").read_bytes(), password=None
+    )
+    seller_sig = seller_ed25519_priv.sign(b"KEY_EXCHANGE:" + seller_pub_bytes)
+    print(f"  [SELLER] Ephemeral X25519 pub generated + signed with Ed25519")
+
+    # ── Mutual authentication: verify each other's handshake signatures ──────
+    buyer_ed25519_pub  = buyer_ed25519_priv.public_key()
+    seller_ed25519_pub = _load_ed25519_public_key(seller_agent_id)
+
+    buyer_ed25519_pub.verify(buyer_sig, b"KEY_EXCHANGE:" + buyer_pub_bytes)
+    seller_ed25519_pub.verify(seller_sig, b"KEY_EXCHANGE:" + seller_pub_bytes)
+    print(f"  [CRYPTO] Signatures verified ✓")
+
+    # ── Derive shared secret via X25519 DH ───────────────────────────────────
+    shared_secret = buyer_eph_priv.exchange(seller_eph_pub)
+    # Deterministic salt: XOR of both ephemeral public keys (same on both sides)
+    salt = bytes(a ^ b for a, b in zip(buyer_pub_bytes, seller_pub_bytes))
+
+    session_key = HKDF(
+        algorithm = hashes.SHA256(),
+        length    = 32,
+        salt      = salt,
+        info      = b"AGENTMARKET-NEGOTIATION-v1",
+    ).derive(shared_secret)
+
+    print(f"  [CRYPTO] Session key derived via HKDF-SHA256 (AES-256-GCM ready)")
+    print(f"  [CRYPTO] All negotiation messages will be encrypted in the log")
+    print("[CRYPTO] ─────────────────────────────────────────────────────────\n")
+    return session_key
+
+
+# ---------------------------------------------------------------------------
 # Policy engine
 # ---------------------------------------------------------------------------
 
@@ -264,11 +377,17 @@ class SellerAgent:
     """
 
     def __init__(self, task_id: str):
-        self.agent_id = SELLER_AGENT_ID
-        self.company  = SELLER_COMPANY
-        self.task_id  = task_id
+        self.agent_id   = SELLER_AGENT_ID
+        self.company    = SELLER_COMPANY
+        self.task_id    = task_id
+        self.session_key: bytes | None = None
 
     def _send(self, method: str, to: str, payload: dict) -> A2AMessage:
+        logged_payload = (
+            _encrypt(payload, self.session_key)
+            if self.session_key
+            else payload
+        )
         msg = A2AMessage(
             message_id = str(uuid.uuid4()),
             task_id    = self.task_id,
@@ -276,10 +395,11 @@ class SellerAgent:
             to_agent   = to,
             role       = "seller",
             method     = method,
-            payload    = payload,
+            payload    = logged_payload,
         )
         _log("message_sent", msg.to_dict())
-        return msg
+        # Return message with plaintext payload so the receiving agent can read it
+        return dataclasses.replace(msg, payload=payload)
 
     def handle_rfq(self, rfq: A2AMessage) -> A2AMessage:
         """Receive RFQ and return a quote."""
@@ -357,12 +477,18 @@ class BuyerAgent:
     """
 
     def __init__(self, task_id: str):
-        self.agent_id = BUYER_AGENT_ID
-        self.company  = BUYER_COMPANY
-        self.task_id  = task_id
+        self.agent_id    = BUYER_AGENT_ID
+        self.company     = BUYER_COMPANY
+        self.task_id     = task_id
         self.agreed_price: float | None = None
+        self.session_key: bytes | None = None
 
     def _send(self, method: str, to: str, payload: dict) -> A2AMessage:
+        logged_payload = (
+            _encrypt(payload, self.session_key)
+            if self.session_key
+            else payload
+        )
         msg = A2AMessage(
             message_id = str(uuid.uuid4()),
             task_id    = self.task_id,
@@ -370,10 +496,11 @@ class BuyerAgent:
             to_agent   = to,
             role       = "buyer",
             method     = method,
-            payload    = payload,
+            payload    = logged_payload,
         )
         _log("message_sent", msg.to_dict())
-        return msg
+        # Return message with plaintext payload so the receiving agent can read it
+        return dataclasses.replace(msg, payload=payload)
 
     def send_rfq(self, to: str) -> A2AMessage:
         """Initiate the negotiation with a Request for Quote."""
@@ -551,6 +678,15 @@ def run_negotiation() -> DealArtifact:
 
     buyer  = BuyerAgent(task_id)
     seller = SellerAgent(task_id)
+
+    # ── Authenticated key exchange (ECDHE + Ed25519) ─────────────────────────
+    session_key = _perform_handshake(
+        buyer_key_name  = "buyer-acmecorp",
+        seller_agent_id = SELLER_AGENT_ID,
+    )
+    buyer.session_key  = session_key
+    seller.session_key = session_key
+    # ─────────────────────────────────────────────────────────────────────────
 
     # Step 1: Buyer sends RFQ
     rfq = buyer.send_rfq(to=seller.agent_id)

@@ -8,6 +8,8 @@ interface DealArtifact {
   status: string;
   verified?: boolean;
   chain_valid?: boolean;
+  artifact_hash?: string;
+  isNew?: boolean;
   parties: {
     buyer: { agent_id: string; company: string };
     seller: { agent_id: string; company: string; legal_entity_id: string };
@@ -94,7 +96,7 @@ export function ArtifactsTable({ artifacts }: { artifacts: DealArtifact[] }) {
             <tr
               key={a.artifact_id}
               style={{ borderTop: "1px solid #0d0d0d" }}
-              className="transition-colors"
+              className={`transition-colors${a.isNew ? " row-new" : ""}`}
               onMouseEnter={(e) => {
                 (e.currentTarget as HTMLTableRowElement).style.background = "#050505";
               }}
