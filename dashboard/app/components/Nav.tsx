@@ -10,6 +10,7 @@ const navLinks = [
   { label: "LEDGER",       href: "/ledger" },
   { label: "CLEARINGHOUSE", href: "/clearinghouse" },
   { label: "POLICIES",     href: "/policies" },
+  { label: "DEVELOPER",   href: "/developer" },
   { label: "DOCS",         href: "/docs" },
   { label: "GITHUB",       href: "https://github.com/singafranci02/marketplace", external: true },
 ];
