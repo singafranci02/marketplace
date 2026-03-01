@@ -5,14 +5,20 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
 
-const navLinks = [
-  { label: "REGISTRY",     href: "/#registry" },
-  { label: "LEDGER",       href: "/ledger" },
+interface NavLink { label: string; href: string; external?: boolean; }
+
+const PUBLIC_LINKS: NavLink[] = [
+  { label: "REGISTRY", href: "/#registry" },
+  { label: "DOCS",     href: "/docs" },
+  { label: "GITHUB",   href: "https://github.com/singafranci02/marketplace", external: true },
+];
+
+const APP_LINKS: NavLink[] = [
+  { label: "LEDGER",        href: "/ledger" },
   { label: "CLEARINGHOUSE", href: "/clearinghouse" },
-  { label: "POLICIES",     href: "/policies" },
-  { label: "DEVELOPER",   href: "/developer" },
-  { label: "DOCS",         href: "/docs" },
-  { label: "GITHUB",       href: "https://github.com/singafranci02/marketplace", external: true },
+  { label: "POLICIES",      href: "/policies" },
+  { label: "DEVELOPER",     href: "/developer" },
+  { label: "DOCS",          href: "/docs" },
 ];
 
 export function Nav() {
@@ -55,7 +61,7 @@ export function Nav() {
 
       {/* Links + Auth */}
       <div className="flex items-center gap-6 text-xs">
-        {navLinks.map(({ label, href, external }) => (
+        {(user ? APP_LINKS : PUBLIC_LINKS).map(({ label, href, external }) => (
           <Link
             key={label}
             href={href}
