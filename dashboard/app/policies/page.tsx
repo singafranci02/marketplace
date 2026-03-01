@@ -22,6 +22,16 @@ async function getPolicies(): Promise<Policy[]> {
   return (data as Policy[]) ?? [];
 }
 
+async function getKillSwitch(): Promise<boolean> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("kill_switch")
+    .select("active")
+    .eq("id", 1)
+    .single();
+  return data?.active ?? false;
+}
+
 const FIELD_LABELS: Record<string, string> = {
   "terms.price_usd_monthly":        "Monthly Price (USD)",
   "terms.seats":                    "Seats",
@@ -30,7 +40,7 @@ const FIELD_LABELS: Record<string, string> = {
 };
 
 export default async function PoliciesPage() {
-  const policies = await getPolicies();
+  const [policies, paused] = await Promise.all([getPolicies(), getKillSwitch()]);
   const fieldsCovered = new Set(policies.map((p) => p.field)).size;
 
   return (
@@ -68,7 +78,7 @@ export default async function PoliciesPage() {
           ))}
         </div>
 
-        <PolicyManager initialPolicies={policies} fieldLabels={FIELD_LABELS} />
+        <PolicyManager initialPolicies={policies} fieldLabels={FIELD_LABELS} initialPaused={paused} />
 
         <p className="mt-8 text-xs font-mono" style={{ color: "#666" }}>
           EVALUATED AT SIGN TIME · ENDPOINT: /api/verify-policy · STORAGE: Supabase policies

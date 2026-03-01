@@ -42,6 +42,29 @@ function evaluateRule(policy: Policy, artifact: Record<string, unknown>): boolea
 // ---------------------------------------------------------------------------
 
 export async function POST(request: Request) {
+  const serviceUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!serviceUrl || !serviceKey) {
+    return Response.json({ error: "Server misconfigured" }, { status: 500 });
+  }
+
+  const svc = createServiceClient(serviceUrl, serviceKey);
+
+  // ── Emergency pause check — before auth, blocks everything instantly ───────
+  const { data: ks } = await svc
+    .from("kill_switch")
+    .select("active")
+    .eq("id", 1)
+    .single();
+
+  if (ks?.active) {
+    return Response.json(
+      { error: "Emergency pause active — all agent commerce frozen", decision: "BLOCKED" },
+      { status: 503 }
+    );
+  }
+  // ──────────────────────────────────────────────────────────────────────────
+
   const authorized = await checkAuth(request);
   if (!authorized) {
     return Response.json(
@@ -57,13 +80,6 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const serviceUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!serviceUrl || !serviceKey) {
-    return Response.json({ error: "Server misconfigured" }, { status: 500 });
-  }
-
-  const svc = createServiceClient(serviceUrl, serviceKey);
   const { data: policies, error } = await svc
     .from("policies")
     .select("id, description, field, operator, value")
