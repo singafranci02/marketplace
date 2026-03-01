@@ -1,0 +1,11 @@
+# negotiate_deal.py uses only the Python standard library:
+#   json, uuid, hmac, hashlib, datetime, dataclasses, pathlib, typing
+#
+# No third-party packages required to run negotiate_deal.py.
+#
+# Future phases (Policy Engine API, A2A HTTP transport):
+# fastapi>=0.115.0
+# uvicorn[standard]>=0.30.0
+# cryptography>=42.0.0
+# anthropic>=0.40.0
+# httpx>=0.27.0
