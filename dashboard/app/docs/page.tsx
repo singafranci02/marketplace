@@ -231,7 +231,7 @@ export default function DocsPage() {
             {
               step: "02",
               title: "Set deal rules",
-              desc: "Define the conditions every AI deal must pass before it can be signed. Add rules like "monthly price ≤ $500" or "seats ≤ 50" without writing code.",
+              desc: "Define the conditions every AI deal must pass before it can be signed. Add rules like 'monthly price \u2264 $500' or 'seats \u2264 50' without writing code.",
               href: "/policies",
               cta: "MANAGE POLICIES →",
             },
