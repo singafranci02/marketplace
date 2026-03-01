@@ -21,6 +21,7 @@ export function ApiKeyManager({ initialKeys }: { initialKeys: ApiKey[] }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [revoking, setRevoking] = useState<string | null>(null);
 
   async function generateKey() {
     if (!keyName.trim()) return;
@@ -47,6 +48,15 @@ export function ApiKeyManager({ initialKeys }: { initialKeys: ApiKey[] }) {
       setKeyName("");
     }
     setLoading(false);
+  }
+
+  async function revokeKey(id: string) {
+    setRevoking(id);
+    const res = await fetch(`/api/api-keys?id=${id}`, { method: "DELETE" });
+    if (res.ok) {
+      setKeys((prev) => prev.filter((k) => k.id !== id));
+    }
+    setRevoking(null);
   }
 
   async function copyKey() {
@@ -166,9 +176,19 @@ export function ApiKeyManager({ initialKeys }: { initialKeys: ApiKey[] }) {
                     })}
                   </p>
                 </div>
-                <span className="text-xs font-mono" style={{ color: "#333" }}>
-                  sk-••••••••••••••••
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-mono" style={{ color: "#333" }}>
+                    sk-••••••••••••••••
+                  </span>
+                  <button
+                    onClick={() => revokeKey(k.id)}
+                    disabled={revoking === k.id}
+                    className="text-xs font-bold tracking-widest uppercase px-3 py-1.5 transition-colors duration-150 disabled:opacity-40"
+                    style={{ border: "1px solid #ff444433", color: "#ff4444", background: "#ff444408" }}
+                  >
+                    {revoking === k.id ? "REVOKING…" : "REVOKE"}
+                  </button>
+                </div>
               </div>
             ))}
           </div>
