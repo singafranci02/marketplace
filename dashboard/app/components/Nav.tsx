@@ -9,6 +9,7 @@ interface NavLink { label: string; href: string; external?: boolean; }
 
 const PUBLIC_LINKS: NavLink[] = [
   { label: "REGISTRY", href: "/#registry" },
+  { label: "LEARN",    href: "/learn" },
   { label: "DOCS",     href: "/docs" },
   { label: "GITHUB",   href: "https://github.com/singafranci02/marketplace", external: true },
 ];
@@ -18,6 +19,7 @@ const APP_LINKS: NavLink[] = [
   { label: "CLEARINGHOUSE", href: "/clearinghouse" },
   { label: "POLICIES",      href: "/policies" },
   { label: "DEVELOPER",     href: "/developer" },
+  { label: "LEARN",         href: "/learn" },
   { label: "DOCS",          href: "/docs" },
 ];
 
