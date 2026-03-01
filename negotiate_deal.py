@@ -509,7 +509,11 @@ def generate_signed_artifact(
 
     # Gate: external policy engine must approve before signing
     print(f"\n[SYSTEM] Calling external policy engine...")
-    _verify_policy(artifact.to_dict())   # raises RuntimeError if 403
+    policy_response = _verify_policy(artifact.to_dict())   # raises RuntimeError if 403
+    reservation_id = policy_response.get("reservation_id")
+    if reservation_id:
+        artifact.policy_check["reservation_id"] = reservation_id
+        print(f"  [ESCROW] Reservation locked: {reservation_id}")
 
     body = artifact.canonical_body()
     artifact.signatures = {

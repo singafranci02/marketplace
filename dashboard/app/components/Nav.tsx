@@ -6,11 +6,12 @@ import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
 
 const navLinks = [
-  { label: "REGISTRY", href: "/#registry" },
-  { label: "LEDGER",   href: "/ledger" },
-  { label: "POLICIES", href: "/policies" },
-  { label: "DOCS",     href: "/docs" },
-  { label: "GITHUB",   href: "https://github.com/singafranci02/marketplace", external: true },
+  { label: "REGISTRY",     href: "/#registry" },
+  { label: "LEDGER",       href: "/ledger" },
+  { label: "CLEARINGHOUSE", href: "/clearinghouse" },
+  { label: "POLICIES",     href: "/policies" },
+  { label: "DOCS",         href: "/docs" },
+  { label: "GITHUB",       href: "https://github.com/singafranci02/marketplace", external: true },
 ];
 
 export function Nav() {

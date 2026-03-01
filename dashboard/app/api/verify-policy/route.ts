@@ -99,7 +99,66 @@ export async function POST(request: Request) {
     );
   }
 
-  return Response.json({ decision: "APPROVED", results });
+  // ── Solvency check + escrow reservation ──────────────────────────────
+  const buyerAgentId = getNestedValue(artifact, "parties.buyer.agent_id") as string | undefined;
+  const amountUsd    = getNestedValue(artifact, "terms.price_usd_monthly") as number | undefined;
+  let reservationId: string | undefined;
+
+  if (buyerAgentId && amountUsd && amountUsd > 0) {
+    // 1. Lazy-expire stale reservations for this buyer
+    await svc
+      .from("pending_reservations")
+      .update({ status: "expired" })
+      .eq("buyer_agent_id", buyerAgentId)
+      .eq("status", "pending")
+      .lt("expires_at", new Date().toISOString());
+
+    // 2. Fetch balance record
+    const { data: balRow } = await svc
+      .from("company_balances")
+      .select("balance_usd")
+      .eq("agent_id", buyerAgentId)
+      .maybeSingle();
+
+    if (!balRow) {
+      return Response.json(
+        { decision: "BLOCKED", reasons: ["No balance record for buyer agent"], results },
+        { status: 403 }
+      );
+    }
+
+    // 3. Sum active pending locks
+    const { data: pending } = await svc
+      .from("pending_reservations")
+      .select("amount_usd")
+      .eq("buyer_agent_id", buyerAgentId)
+      .eq("status", "pending");
+
+    const locked    = (pending ?? []).reduce((s, r) => s + Number(r.amount_usd), 0);
+    const available = Number(balRow.balance_usd) - locked;
+
+    if (available < amountUsd) {
+      return Response.json(
+        {
+          decision: "BLOCKED",
+          reasons: [`Insufficient funds: available $${available.toFixed(2)}, required $${amountUsd}`],
+          results,
+        },
+        { status: 403 }
+      );
+    }
+
+    // 4. Create pending reservation (15-min TTL)
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+    const { data: reservation } = await svc
+      .from("pending_reservations")
+      .insert({ buyer_agent_id: buyerAgentId, amount_usd: amountUsd, expires_at: expiresAt })
+      .select("id")
+      .single();
+    reservationId = reservation?.id;
+  }
+
+  return Response.json({ decision: "APPROVED", results, reservation_id: reservationId ?? null });
 }
 
 // ---------------------------------------------------------------------------

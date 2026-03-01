@@ -181,6 +181,45 @@ export async function POST(request: Request) {
 
   const svc = createServiceClient(serviceUrl, serviceKey);
 
+  // ── Commit pending reservation if present ──────────────────────────────
+  const reservationId = (artifact as { policy_check?: { reservation_id?: string } })
+    .policy_check?.reservation_id;
+
+  if (reservationId) {
+    const { data: reservation } = await svc
+      .from("pending_reservations")
+      .select("id, buyer_agent_id, amount_usd, status, expires_at")
+      .eq("id", reservationId)
+      .maybeSingle();
+
+    if (
+      reservation &&
+      reservation.status === "pending" &&
+      new Date(reservation.expires_at) > new Date()
+    ) {
+      await svc
+        .from("pending_reservations")
+        .update({ status: "committed" })
+        .eq("id", reservationId);
+
+      await svc.rpc("deduct_balance", {
+        p_agent_id: reservation.buyer_agent_id,
+        p_amount:   reservation.amount_usd,
+      });
+
+      const sellerAgentId =
+        (artifact.parties as { seller?: { agent_id?: string } })?.seller?.agent_id;
+
+      await svc.from("transactions").insert({
+        reservation_id:  reservationId,
+        buyer_agent_id:  reservation.buyer_agent_id,
+        seller_agent_id: sellerAgentId ?? null,
+        amount_usd:      reservation.amount_usd,
+        artifact_id:     artifact.artifact_id ?? null,
+      });
+    }
+  }
+
   // Get prev_hash from the most recent row
   const { data: lastRow } = await svc
     .from("ledger")

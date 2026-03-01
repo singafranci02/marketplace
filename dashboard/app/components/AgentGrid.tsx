@@ -14,6 +14,7 @@ interface AgentCard {
   endpoint: string;
   verified: boolean;
   joined_at: string;
+  status?: "ACTIVE" | "INACTIVE";
 }
 
 function ComplianceBadge({ label }: { label: string }) {
@@ -51,7 +52,7 @@ export function AgentGrid({ agents }: { agents: AgentCard[] }) {
           VERIFIED AGENTS
         </p>
         <p className="text-xs font-mono" style={{ color: "#666" }}>
-          {agents.length} LISTED · ALL MARKETPLACE_SIGNED
+          {agents.length} LISTED · {agents.filter(a => a.status !== "INACTIVE").length} ACTIVE · MARKETPLACE_SIGNED
         </p>
 
       </div>
@@ -73,14 +74,26 @@ export function AgentGrid({ agents }: { agents: AgentCard[] }) {
                   {agent.owner}
                 </p>
               </div>
-              {agent.verified && (
+              <div className="flex items-center gap-1.5">
                 <span
-                  className="text-xs font-mono px-1.5 py-0.5 rounded-sm"
-                  style={{ color: "#02f8c5", border: "1px solid #02f8c522", background: "#02f8c508" }}
+                  className="text-xs font-mono px-1.5 py-0.5"
+                  style={{
+                    color:      agent.status === "INACTIVE" ? "#555" : "#02f8c5",
+                    border:     `1px solid ${agent.status === "INACTIVE" ? "#222" : "#02f8c522"}`,
+                    background: agent.status === "INACTIVE" ? "transparent" : "#02f8c508",
+                  }}
                 >
-                  ✓
+                  {agent.status === "INACTIVE" ? "OFFLINE" : "LIVE"}
                 </span>
-              )}
+                {agent.verified && (
+                  <span
+                    className="text-xs font-mono px-1.5 py-0.5 rounded-sm"
+                    style={{ color: "#02f8c5", border: "1px solid #02f8c522", background: "#02f8c508" }}
+                  >
+                    ✓
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* Legal ID */}

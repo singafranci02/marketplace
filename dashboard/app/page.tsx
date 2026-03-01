@@ -25,11 +25,37 @@ async function getDealCount(): Promise<number> {
   return count ?? 0;
 }
 
+async function getHeartbeats(): Promise<Record<string, string>> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return {};
+  const svc = createServiceClient(url, key);
+  const { data } = await svc
+    .from("agent_heartbeats")
+    .select("agent_id, last_seen_at");
+  const map: Record<string, string> = {};
+  for (const row of data ?? []) map[row.agent_id] = row.last_seen_at;
+  return map;
+}
+
 export default async function HomePage() {
-  const [agents, dealCount] = await Promise.all([
+  const [agents, dealCount, heartbeats] = await Promise.all([
     Promise.resolve(getAgents()),
     getDealCount(),
+    getHeartbeats(),
   ]);
+
+  const STALE_MS = 3 * 60 * 1000;
+  const now = Date.now();
+  const hasAnyHeartbeat = Object.keys(heartbeats).length > 0;
+
+  const annotatedAgents = agents.map((a: { agent_id: string }) => {
+    const lastSeen = heartbeats[a.agent_id];
+    const active = hasAnyHeartbeat
+      ? (lastSeen ? now - new Date(lastSeen).getTime() < STALE_MS : false)
+      : true;
+    return { ...a, status: active ? "ACTIVE" : "INACTIVE" };
+  });
 
   return (
     <>
@@ -40,7 +66,7 @@ export default async function HomePage() {
       <ProcessSteps />
 
       <section id="registry">
-        <AgentGrid agents={agents} />
+        <AgentGrid agents={annotatedAgents} />
       </section>
 
       {/* ── API Section ── */}
