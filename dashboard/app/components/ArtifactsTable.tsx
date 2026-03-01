@@ -7,6 +7,7 @@ interface DealArtifact {
   schema_version: string;
   status: string;
   verified?: boolean;
+  chain_valid?: boolean;
   parties: {
     buyer: { agent_id: string; company: string };
     seller: { agent_id: string; company: string; legal_entity_id: string };
@@ -54,7 +55,7 @@ function formatDate(iso: string): string {
 }
 
 const COLS = [
-  "#", "TIMESTAMP (UTC)", "BUYER", "SELLER", "PRODUCT", "SEATS", "PRICE / MO", "POLICY", "STATUS", "SIG",
+  "#", "TIMESTAMP (UTC)", "BUYER", "SELLER", "PRODUCT", "SEATS", "PRICE / MO", "POLICY", "STATUS", "SIG", "CHAIN",
 ];
 
 export function ArtifactsTable({ artifacts }: { artifacts: DealArtifact[] }) {
@@ -168,6 +169,30 @@ export function ArtifactsTable({ artifacts }: { artifacts: DealArtifact[] }) {
                     }}
                   >
                     {a.verified ? "✓ ED25519" : "✗ INVALID"}
+                  </span>
+                )}
+              </td>
+
+              <td className="px-4 py-3 whitespace-nowrap">
+                {a.chain_valid === undefined ? (
+                  <span className="text-xs font-mono" style={{ color: "#333" }}>—</span>
+                ) : idx === 0 ? (
+                  <span
+                    className="inline-block px-2 py-0.5 text-xs font-mono"
+                    style={{ color: "#888", border: "1px solid #1a1a1a" }}
+                  >
+                    ⬤ GENESIS
+                  </span>
+                ) : (
+                  <span
+                    className="inline-block px-2 py-0.5 text-xs font-mono"
+                    style={{
+                      color:      a.chain_valid ? "#02f8c5" : "#ff4444",
+                      border:     `1px solid ${a.chain_valid ? "#02f8c522" : "#ff444422"}`,
+                      background: a.chain_valid ? "#02f8c508" : "#ff444408",
+                    }}
+                  >
+                    {a.chain_valid ? "✓ LINKED" : "✗ BROKEN"}
                   </span>
                 )}
               </td>

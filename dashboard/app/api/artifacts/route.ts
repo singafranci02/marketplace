@@ -4,8 +4,7 @@ import { verify as cryptoVerify, createHash } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 
-const ARTIFACTS_PATH = join(process.cwd(), "..", "artifacts.json");
-const DB_PATH        = join(process.cwd(), "..", "database.json");
+const DB_PATH = join(process.cwd(), "..", "database.json");
 
 // ---------------------------------------------------------------------------
 // Key-sorting utility — must match Python's json.dumps(sort_keys=True)
@@ -34,12 +33,28 @@ interface ArtifactSignatures {
 }
 
 interface Artifact {
+  artifact_id?: string;
   signatures?: ArtifactSignatures;
   parties?: {
     buyer?: { agent_id?: string };
     seller?: { agent_id?: string };
   };
   [key: string]: unknown;
+}
+
+function buildAgentMap(): Record<string, string> {
+  const agentMap: Record<string, string> = {};
+  if (existsSync(DB_PATH)) {
+    try {
+      const db = JSON.parse(readFileSync(DB_PATH, "utf-8"));
+      for (const agent of db.agents ?? []) {
+        if (agent.agent_id && agent.public_key) {
+          agentMap[agent.agent_id] = agent.public_key;
+        }
+      }
+    } catch { /* ignore parse errors */ }
+  }
+  return agentMap;
 }
 
 function canonicalBody(artifact: Artifact): Buffer {
@@ -55,10 +70,10 @@ function verifyArtifact(
 ): boolean {
   if (artifact.signatures?.algorithm !== "Ed25519") return false;
 
-  const body     = canonicalBody(artifact);
-  const buyerId  = artifact.parties?.buyer?.agent_id;
-  const sellerId = artifact.parties?.seller?.agent_id;
-  const buyerKey = buyerId  ? agentMap[buyerId]  : undefined;
+  const body      = canonicalBody(artifact);
+  const buyerId   = artifact.parties?.buyer?.agent_id;
+  const sellerId  = artifact.parties?.seller?.agent_id;
+  const buyerKey  = buyerId  ? agentMap[buyerId]  : undefined;
   const sellerKey = sellerId ? agentMap[sellerId] : undefined;
 
   if (!buyerKey || !sellerKey) return false;
@@ -83,7 +98,7 @@ function verifyArtifact(
 }
 
 // ---------------------------------------------------------------------------
-// Route handler
+// GET — read ledger from Supabase
 // ---------------------------------------------------------------------------
 
 export async function GET(request: Request) {
@@ -95,37 +110,110 @@ export async function GET(request: Request) {
     );
   }
 
-  // Build agent_id → public_key map from database.json
-  const agentMap: Record<string, string> = {};
-  if (existsSync(DB_PATH)) {
-    try {
-      const db = JSON.parse(readFileSync(DB_PATH, "utf-8"));
-      for (const agent of db.agents ?? []) {
-        if (agent.agent_id && agent.public_key) {
-          agentMap[agent.agent_id] = agent.public_key;
-        }
-      }
-    } catch { /* ignore parse errors */ }
-  }
-
-  if (!existsSync(ARTIFACTS_PATH)) {
+  const serviceUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!serviceUrl || !serviceKey) {
     return Response.json([], { headers: { "Access-Control-Allow-Origin": "*" } });
   }
 
-  try {
-    const raw: Artifact[] = JSON.parse(readFileSync(ARTIFACTS_PATH, "utf-8"));
-    const result = raw.map((a) => ({
-      ...a,
-      verified: verifyArtifact(a, agentMap),
-    }));
-    return Response.json(result, { headers: { "Access-Control-Allow-Origin": "*" } });
-  } catch {
+  const svc = createServiceClient(serviceUrl, serviceKey);
+  const { data: rows, error } = await svc
+    .from("ledger")
+    .select("*")
+    .order("id", { ascending: true });
+
+  if (error) {
     return Response.json(
-      { error: "Failed to read artifacts.json" },
+      { error: error.message },
       { status: 500, headers: { "Access-Control-Allow-Origin": "*" } }
     );
   }
+
+  const result = (rows ?? []).map((row, idx) => {
+    const chainValid =
+      idx === 0
+        ? row.prev_hash === "GENESIS"
+        : row.prev_hash === rows[idx - 1].artifact_hash;
+    return { ...row.artifact, verified: row.verified, chain_valid: chainValid };
+  });
+
+  return Response.json(result, { headers: { "Access-Control-Allow-Origin": "*" } });
 }
+
+// ---------------------------------------------------------------------------
+// POST — receive artifact, verify, chain-hash, store in Supabase
+// ---------------------------------------------------------------------------
+
+export async function POST(request: Request) {
+  const authorized = await checkAuth(request);
+  if (!authorized) {
+    return Response.json(
+      { error: "Unauthorized. Provide Authorization: Bearer <api-key>" },
+      { status: 401, headers: { "Access-Control-Allow-Origin": "*" } }
+    );
+  }
+
+  let artifact: Artifact;
+  try {
+    artifact = await request.json();
+  } catch {
+    return Response.json(
+      { error: "Invalid JSON" },
+      { status: 400, headers: { "Access-Control-Allow-Origin": "*" } }
+    );
+  }
+
+  const agentMap = buildAgentMap();
+  const sigValid  = verifyArtifact(artifact, agentMap);
+
+  // SHA-256 of the full artifact JSON (sorted keys, compact — includes signatures)
+  const artifactJson = JSON.stringify(sortKeysDeep(artifact));
+  const artifactHash = createHash("sha256").update(artifactJson).digest("hex");
+
+  const serviceUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!serviceUrl || !serviceKey) {
+    return Response.json(
+      { error: "Server misconfigured" },
+      { status: 500, headers: { "Access-Control-Allow-Origin": "*" } }
+    );
+  }
+
+  const svc = createServiceClient(serviceUrl, serviceKey);
+
+  // Get prev_hash from the most recent row
+  const { data: lastRow } = await svc
+    .from("ledger")
+    .select("artifact_hash")
+    .order("id", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const prevHash = lastRow ? lastRow.artifact_hash : "GENESIS";
+
+  const { error } = await svc.from("ledger").insert({
+    artifact_id:   artifact.artifact_id ?? `artifact-${Date.now()}`,
+    artifact,
+    artifact_hash: artifactHash,
+    prev_hash:     prevHash,
+    verified:      sigValid,
+  });
+
+  if (error) {
+    return Response.json(
+      { error: error.message },
+      { status: 500, headers: { "Access-Control-Allow-Origin": "*" } }
+    );
+  }
+
+  return Response.json(
+    { artifact_hash: artifactHash, prev_hash: prevHash, verified: sigValid },
+    { status: 201, headers: { "Access-Control-Allow-Origin": "*" } }
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Auth helpers
+// ---------------------------------------------------------------------------
 
 async function checkAuth(request: Request): Promise<boolean> {
   const authHeader = request.headers.get("authorization");

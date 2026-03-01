@@ -42,9 +42,15 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  if (request.nextUrl.pathname.startsWith("/policies") && !user) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/auth/login";
+    return NextResponse.redirect(url);
+  }
+
   return supabaseResponse;
 }
 
 export const config = {
-  matcher: ["/ledger/:path*", "/account/:path*"],
+  matcher: ["/ledger/:path*", "/account/:path*", "/policies/:path*"],
 };

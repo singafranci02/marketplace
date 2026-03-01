@@ -20,6 +20,8 @@ import uuid
 import base64
 import datetime
 import dataclasses
+import urllib.request
+import urllib.error
 from pathlib import Path
 from typing import Literal
 
@@ -42,8 +44,8 @@ SELLER_ASKING_PRICE   = 420   # Seller's initial quote (per month for 10 seats)
 SELLER_FLOOR_PRICE    = 380   # Minimum the seller will accept
 
 AUDIT_LOG_PATH    = Path(__file__).parent / "negotiation_log.jsonl"
-ARTIFACTS_PATH    = Path(__file__).parent / "artifacts.json"
 KEYS_DIR          = Path(__file__).parent / "agent-keys"
+_ENV_PATH         = Path(__file__).parent / ".env"
 
 # ---------------------------------------------------------------------------
 # A2A Message primitives
@@ -123,16 +125,69 @@ def _log(event_type: str, data: dict) -> None:
     print(f"  [AUDIT] {event_type}")
 
 
-def _append_artifact(artifact: dict) -> None:
-    """Upsert the artifact into artifacts.json (array of all deals)."""
-    if ARTIFACTS_PATH.exists():
-        existing = json.loads(ARTIFACTS_PATH.read_text(encoding="utf-8"))
-    else:
-        existing = []
-    existing.append(artifact)
-    ARTIFACTS_PATH.write_text(
-        json.dumps(existing, indent=2, ensure_ascii=False), encoding="utf-8"
+def _read_env() -> tuple[str, str]:
+    """Read AGENTMARKET_API_KEY and AGENTMARKET_API_BASE from marketplace/.env."""
+    api_key, api_base = "", "http://localhost:3000"
+    if _ENV_PATH.exists():
+        for line in _ENV_PATH.read_text().splitlines():
+            if line.startswith("AGENTMARKET_API_KEY="):
+                api_key = line.split("=", 1)[1].strip()
+            elif line.startswith("AGENTMARKET_API_BASE="):
+                api_base = line.split("=", 1)[1].strip()
+    return api_key, api_base
+
+
+def _verify_policy(proposed_artifact: dict) -> dict:
+    """
+    Call /api/verify-policy before signing.
+    Raises RuntimeError if the policy engine blocks the deal (HTTP 403).
+    Returns the policy evaluation result dict.
+    """
+    api_key, api_base = _read_env()
+    url  = f"{api_base}/api/verify-policy"
+    data = json.dumps(proposed_artifact).encode()
+    req  = urllib.request.Request(
+        url,
+        data    = data,
+        headers = {
+            "Content-Type":  "application/json",
+            "Authorization": f"Bearer {api_key}",
+        },
+        method  = "POST",
     )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            result = json.loads(resp.read())
+            n = len(result.get("results", []))
+            print(f"  [POLICY] {result['decision']} — {n} rule(s) checked")
+            return result
+    except urllib.error.HTTPError as e:
+        body = json.loads(e.read().decode())
+        reasons = "; ".join(body.get("reasons", ["Policy check failed"]))
+        print(f"  [POLICY] BLOCKED — {reasons}")
+        raise RuntimeError(f"Policy engine blocked this deal: {reasons}")
+
+
+def _post_artifact(artifact: dict) -> None:
+    """POST the signed artifact to the Next.js API → Supabase ledger."""
+    api_key, api_base = _read_env()
+    url  = f"{api_base}/api/artifacts"
+    data = json.dumps(artifact).encode()
+    req  = urllib.request.Request(
+        url,
+        data    = data,
+        headers = {
+            "Content-Type":  "application/json",
+            "Authorization": f"Bearer {api_key}",
+        },
+        method  = "POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            print(f"  [LEDGER] Posted to {url} → HTTP {resp.status}")
+    except urllib.error.HTTPError as e:
+        print(f"  [LEDGER] HTTP {e.code}: {e.read().decode()}")
+        raise
 
 
 # ---------------------------------------------------------------------------
@@ -452,6 +507,10 @@ def generate_signed_artifact(
         policy_check = policy_result,
     )
 
+    # Gate: external policy engine must approve before signing
+    print(f"\n[SYSTEM] Calling external policy engine...")
+    _verify_policy(artifact.to_dict())   # raises RuntimeError if 403
+
     body = artifact.canonical_body()
     artifact.signatures = {
         "buyer_signature":  _sign(body, "buyer-acmecorp"),
@@ -460,7 +519,7 @@ def generate_signed_artifact(
     }
 
     _log("artifact_signed", artifact.to_dict())
-    _append_artifact(artifact.to_dict())
+    _post_artifact(artifact.to_dict())
     return artifact
 
 

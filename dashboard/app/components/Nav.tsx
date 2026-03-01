@@ -8,6 +8,7 @@ import type { User } from "@supabase/supabase-js";
 const navLinks = [
   { label: "REGISTRY", href: "/#registry" },
   { label: "LEDGER",   href: "/ledger" },
+  { label: "POLICIES", href: "/policies" },
   { label: "API",      href: "/#api" },
   { label: "GITHUB",   href: "https://github.com/singafranci02/marketplace", external: true },
 ];
