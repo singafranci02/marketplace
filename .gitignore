@@ -12,6 +12,9 @@ __pycache__/
 .venv/
 venv/
 
+# Private keys — never commit
+agent-keys/
+
 # Runtime files (generated at runtime — not source)
 negotiation_log.jsonl
 artifacts.json

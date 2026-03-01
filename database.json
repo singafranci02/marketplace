@@ -7,7 +7,7 @@
       "name": "SydneySaaS",
       "owner": "Sydney SaaS Solutions Pty Ltd",
       "legal_entity_id": "AU-ABN-51824753556",
-      "public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA7K3mN8pQvR2xLjF4oWdBcYsHtUeAqMnPkIzVXgSlD9o=\n-----END PUBLIC KEY-----",
+      "public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAw1Cb4fINtXfc6toQyEOBmSYlca6oKikj3uY0bBAvVHw=\n-----END PUBLIC KEY-----\n",
       "verification": {
         "type": "Marketplace_Signed",
         "issued_by": "AgentMarketplace Authority v1",
@@ -23,11 +23,23 @@
           "params_schema": {
             "type": "object",
             "properties": {
-              "vendor_name": { "type": "string", "description": "Name of the SaaS vendor to evaluate" },
-              "requirements": { "type": "string", "description": "JSON string of buyer requirements" },
-              "budget_usd": { "type": "number", "description": "Maximum annual budget in USD" }
+              "vendor_name": {
+                "type": "string",
+                "description": "Name of the SaaS vendor to evaluate"
+              },
+              "requirements": {
+                "type": "string",
+                "description": "JSON string of buyer requirements"
+              },
+              "budget_usd": {
+                "type": "number",
+                "description": "Maximum annual budget in USD"
+              }
             },
-            "required": ["vendor_name", "requirements"]
+            "required": [
+              "vendor_name",
+              "requirements"
+            ]
           },
           "returns": "VendorAssessment object with score, risks, and recommendation"
         },
@@ -37,11 +49,23 @@
           "params_schema": {
             "type": "object",
             "properties": {
-              "vendor_id": { "type": "string", "description": "Vendor agent ID" },
-              "trial_days": { "type": "number", "description": "Requested trial length in days" },
-              "seats": { "type": "number", "description": "Number of seats required during trial" }
+              "vendor_id": {
+                "type": "string",
+                "description": "Vendor agent ID"
+              },
+              "trial_days": {
+                "type": "number",
+                "description": "Requested trial length in days"
+              },
+              "seats": {
+                "type": "number",
+                "description": "Number of seats required during trial"
+              }
             },
-            "required": ["vendor_id", "trial_days"]
+            "required": [
+              "vendor_id",
+              "trial_days"
+            ]
           },
           "returns": "TrialAgreement object with confirmed terms and start date"
         },
@@ -51,16 +75,29 @@
           "params_schema": {
             "type": "object",
             "properties": {
-              "subscription_id": { "type": "string", "description": "Existing subscription identifier" },
-              "action": { "type": "string", "description": "One of: renew, renegotiate, cancel" }
+              "subscription_id": {
+                "type": "string",
+                "description": "Existing subscription identifier"
+              },
+              "action": {
+                "type": "string",
+                "description": "One of: renew, renegotiate, cancel"
+              }
             },
-            "required": ["subscription_id", "action"]
+            "required": [
+              "subscription_id",
+              "action"
+            ]
           },
           "returns": "SubscriptionStatus with updated terms"
         }
       ],
       "policy_endpoint": "https://policy.sydneysaas.io/a2a/deals/approve",
-      "compliance": ["ISO27001", "SOC2-Type2", "Privacy Act 1988"],
+      "compliance": [
+        "ISO27001",
+        "SOC2-Type2",
+        "Privacy Act 1988"
+      ],
       "description": "Specialist AI agent for SaaS procurement and subscription lifecycle management. Evaluates, negotiates, and onboards SaaS vendors for enterprise buyers across APAC.",
       "endpoint": "https://api.sydneysaas.io/a2a",
       "pricing": {
@@ -77,7 +114,7 @@
       "name": "GlobalFreight",
       "owner": "GlobalFreight GmbH",
       "legal_entity_id": "DE-HRB-789456",
-      "public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA3RtYmK6pLqN9dWxFvBcEoAhUsTjZnMeXiQgIlCyPrVw=\n-----END PUBLIC KEY-----",
+      "public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAy26roruRBUCwz9acCZEE1L4YFata0jVNVJtoINat710=\n-----END PUBLIC KEY-----\n",
       "verification": {
         "type": "Marketplace_Signed",
         "issued_by": "AgentMarketplace Authority v1",
@@ -93,12 +130,28 @@
           "params_schema": {
             "type": "object",
             "properties": {
-              "origin": { "type": "string", "description": "Origin port or city" },
-              "destination": { "type": "string", "description": "Destination port or city" },
-              "cargo_kg": { "type": "number", "description": "Cargo weight in kilograms" },
-              "incoterm": { "type": "string", "description": "Incoterm code, e.g. FOB, CIF, DAP" }
+              "origin": {
+                "type": "string",
+                "description": "Origin port or city"
+              },
+              "destination": {
+                "type": "string",
+                "description": "Destination port or city"
+              },
+              "cargo_kg": {
+                "type": "number",
+                "description": "Cargo weight in kilograms"
+              },
+              "incoterm": {
+                "type": "string",
+                "description": "Incoterm code, e.g. FOB, CIF, DAP"
+              }
             },
-            "required": ["origin", "destination", "cargo_kg"]
+            "required": [
+              "origin",
+              "destination",
+              "cargo_kg"
+            ]
           },
           "returns": "FreightQuote with price, transit days, and carrier options"
         },
@@ -108,17 +161,34 @@
           "params_schema": {
             "type": "object",
             "properties": {
-              "shipment_id": { "type": "string", "description": "Internal shipment reference" },
-              "hs_code": { "type": "string", "description": "Harmonised System commodity code" },
-              "country_of_origin": { "type": "string", "description": "ISO 3166-1 alpha-2 country code" }
+              "shipment_id": {
+                "type": "string",
+                "description": "Internal shipment reference"
+              },
+              "hs_code": {
+                "type": "string",
+                "description": "Harmonised System commodity code"
+              },
+              "country_of_origin": {
+                "type": "string",
+                "description": "ISO 3166-1 alpha-2 country code"
+              }
             },
-            "required": ["shipment_id", "hs_code", "country_of_origin"]
+            "required": [
+              "shipment_id",
+              "hs_code",
+              "country_of_origin"
+            ]
           },
           "returns": "DocumentPackage with customs declaration, commercial invoice, and packing list"
         }
       ],
       "policy_endpoint": "https://policy.globalfreight.eu/a2a/deals/approve",
-      "compliance": ["ISO9001", "GDPR-Compliant", "AEO-Certified"],
+      "compliance": [
+        "ISO9001",
+        "GDPR-Compliant",
+        "AEO-Certified"
+      ],
       "description": "Enterprise logistics agent specialising in cross-border freight coordination, customs documentation, and real-time supply chain optimisation for EU and global routes.",
       "endpoint": "https://api.globalfreight.eu/a2a",
       "pricing": {
@@ -135,7 +205,7 @@
       "name": "CloudOps",
       "owner": "CloudOps Inc.",
       "legal_entity_id": "US-EIN-47-3829104",
-      "public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEApQvNxT8mRdKoLjA2YcWsFbDhEzXnUiMgCqIePtZlBr4=\n-----END PUBLIC KEY-----",
+      "public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAXiehbdXdeS0kNX3f8X/gpILU+OQGzNIawpWJiRSmof8=\n-----END PUBLIC KEY-----\n",
       "verification": {
         "type": "Marketplace_Signed",
         "issued_by": "AgentMarketplace Authority v1",
@@ -151,11 +221,24 @@
           "params_schema": {
             "type": "object",
             "properties": {
-              "cloud_provider": { "type": "string", "description": "One of: aws, gcp, azure" },
-              "environment_type": { "type": "string", "description": "One of: dev, staging, production" },
-              "spec": { "type": "string", "description": "JSON string of infrastructure specification" }
+              "cloud_provider": {
+                "type": "string",
+                "description": "One of: aws, gcp, azure"
+              },
+              "environment_type": {
+                "type": "string",
+                "description": "One of: dev, staging, production"
+              },
+              "spec": {
+                "type": "string",
+                "description": "JSON string of infrastructure specification"
+              }
             },
-            "required": ["cloud_provider", "environment_type", "spec"]
+            "required": [
+              "cloud_provider",
+              "environment_type",
+              "spec"
+            ]
           },
           "returns": "ProvisioningResult with resource IDs and connection strings"
         },
@@ -165,10 +248,18 @@
           "params_schema": {
             "type": "object",
             "properties": {
-              "account_id": { "type": "string", "description": "Cloud account or project ID" },
-              "lookback_days": { "type": "number", "description": "Number of days of spend data to analyse" }
+              "account_id": {
+                "type": "string",
+                "description": "Cloud account or project ID"
+              },
+              "lookback_days": {
+                "type": "number",
+                "description": "Number of days of spend data to analyse"
+              }
             },
-            "required": ["account_id"]
+            "required": [
+              "account_id"
+            ]
           },
           "returns": "OptimisationReport with estimated savings and action items"
         },
@@ -178,16 +269,28 @@
           "params_schema": {
             "type": "object",
             "properties": {
-              "framework": { "type": "string", "description": "Compliance framework, e.g. SOC2, NIST-800-53, FedRAMP" },
-              "scope": { "type": "string", "description": "Comma-separated list of services to audit" }
+              "framework": {
+                "type": "string",
+                "description": "Compliance framework, e.g. SOC2, NIST-800-53, FedRAMP"
+              },
+              "scope": {
+                "type": "string",
+                "description": "Comma-separated list of services to audit"
+              }
             },
-            "required": ["framework"]
+            "required": [
+              "framework"
+            ]
           },
           "returns": "AuditReport with findings, severity levels, and remediation steps"
         }
       ],
       "policy_endpoint": "https://policy.cloudops.ai/a2a/deals/approve",
-      "compliance": ["SOC2-Type2", "FedRAMP-Moderate", "NIST-800-53"],
+      "compliance": [
+        "SOC2-Type2",
+        "FedRAMP-Moderate",
+        "NIST-800-53"
+      ],
       "description": "Cloud operations AI agent providing automated infrastructure provisioning, cost optimisation analysis, and security compliance auditing across AWS, GCP, and Azure environments.",
       "endpoint": "https://api.cloudops.ai/a2a",
       "pricing": {
@@ -196,6 +299,33 @@
       },
       "verified": true,
       "joined_at": "2025-01-28T14:45:00Z"
+    },
+    {
+      "schema_version": "1.0",
+      "a2a_version": "0.3.0",
+      "agent_id": "bafybeibuyer0000acmecorp000000000000000000000000000000000001",
+      "name": "AcmeCorpBuyer",
+      "owner": "Acme Corp",
+      "legal_entity_id": "US-EIN-123456789",
+      "public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAPRShXM2TMoe4wnJdnzJO3uuC3CqUTSOL8zXrO2EWEWM=\n-----END PUBLIC KEY-----\n",
+      "verification": {
+        "type": "Marketplace_Signed",
+        "issued_by": "AgentMarketplace Authority v1",
+        "issued_at": "2025-01-01T00:00:00Z",
+        "expires_at": "2027-01-01T00:00:00Z",
+        "certificate_id": "cert-mp-004-us-acmecorpbuyer",
+        "signature": "placeholder_buyer_cert"
+      },
+      "capabilities": [],
+      "policy_endpoint": "https://policy.acmecorp.com/a2a/deals/approve",
+      "compliance": [
+        "SOC2-Type2"
+      ],
+      "description": "Procurement buyer agent for Acme Corp. Discovers, negotiates, and commits to SaaS and service contracts on behalf of the company.",
+      "endpoint": "https://agents.acmecorp.com/a2a",
+      "pricing": null,
+      "verified": true,
+      "joined_at": "2025-01-01T00:00:00Z"
     }
   ]
 }

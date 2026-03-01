@@ -17,12 +17,14 @@ Every handshake is appended to negotiation_log.jsonl as an audit trail.
 
 import json
 import uuid
-import hmac
-import hashlib
+import base64
 import datetime
 import dataclasses
 from pathlib import Path
 from typing import Literal
+
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.hazmat.primitives.serialization import load_pem_private_key
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -41,9 +43,7 @@ SELLER_FLOOR_PRICE    = 380   # Minimum the seller will accept
 
 AUDIT_LOG_PATH    = Path(__file__).parent / "negotiation_log.jsonl"
 ARTIFACTS_PATH    = Path(__file__).parent / "artifacts.json"
-
-# Marketplace HMAC signing key (shared secret — in production: HSM or KMS)
-_MARKETPLACE_SIGNING_KEY = b"marketplace-signing-key-v1-super-secret"
+KEYS_DIR          = Path(__file__).parent / "agent-keys"
 
 # ---------------------------------------------------------------------------
 # A2A Message primitives
@@ -73,7 +73,7 @@ class A2AMessage:
 class DealArtifact:
     """
     The signed deal artifact — the final contract emitted when negotiation succeeds.
-    Both parties include their HMAC signature over the canonical artifact body.
+    Both parties include their Ed25519 signature over the canonical artifact body.
     """
     artifact_id:    str
     task_id:        str
@@ -139,14 +139,23 @@ def _append_artifact(artifact: dict) -> None:
 # Signing helper
 # ---------------------------------------------------------------------------
 
-def _sign(data: bytes, agent_id: str) -> str:
+def _sign(canonical_body: bytes, key_name: str) -> str:
     """
-    HMAC-SHA256 signature over data, keyed by the marketplace signing key.
-    In production: replace with Ed25519 private-key signing per agent.
-    Returns a hex digest prefixed with the agent_id.
+    Ed25519 signature over canonical_body using the agent's private key file.
+    key_name maps to agent-keys/{key_name}.pem (e.g. "buyer-acmecorp").
+    Returns a base64url-encoded 64-byte Ed25519 signature.
     """
-    mac = hmac.new(_MARKETPLACE_SIGNING_KEY, data + agent_id.encode(), hashlib.sha256)
-    return f"{agent_id[:16]}:{mac.hexdigest()}"
+    key_file = KEYS_DIR / f"{key_name}.pem"
+    if not key_file.exists():
+        raise FileNotFoundError(
+            f"Private key not found: {key_file}\n"
+            "Run: python3 generate_keys.py"
+        )
+    private_key: Ed25519PrivateKey = load_pem_private_key(  # type: ignore[assignment]
+        key_file.read_bytes(), password=None
+    )
+    sig_bytes = private_key.sign(canonical_body)
+    return base64.urlsafe_b64encode(sig_bytes).decode()
 
 
 # ---------------------------------------------------------------------------
@@ -414,8 +423,8 @@ def generate_signed_artifact(
 ) -> DealArtifact:
     """
     Build and sign the final deal Artifact.
-    Both parties sign the canonical body with HMAC-SHA256.
-    """
+    Both parties sign the canonical body with Ed25519 (per-agent private key).
+"""
     artifact = DealArtifact(
         artifact_id = f"artifact-{uuid.uuid4()}",
         task_id     = task_id,
@@ -445,10 +454,9 @@ def generate_signed_artifact(
 
     body = artifact.canonical_body()
     artifact.signatures = {
-        "buyer_signature":  _sign(body, buyer.agent_id),
-        "seller_signature": _sign(body, seller.agent_id),
-        "algorithm": "HMAC-SHA256",
-        "note": "Production systems should use Ed25519 per-agent private keys.",
+        "buyer_signature":  _sign(body, "buyer-acmecorp"),
+        "seller_signature": _sign(body, "sydney-saas"),
+        "algorithm": "Ed25519",
     }
 
     _log("artifact_signed", artifact.to_dict())
