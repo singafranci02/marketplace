@@ -8,18 +8,20 @@
     "start": "next start"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^1.0.0",
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.98.0",
+    "ai": "^4.0.0",
     "next": "^15.0.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "ai": "^4.0.0",
-    "@ai-sdk/anthropic": "^1.0.0"
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "typescript": "^5.0.0",
+    "@tailwindcss/postcss": "^4.0.0",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "tailwindcss": "^4.0.0",
-    "@tailwindcss/postcss": "^4.0.0"
+    "typescript": "^5.0.0"
   }
 }

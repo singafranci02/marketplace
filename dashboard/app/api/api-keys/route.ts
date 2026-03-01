@@ -1,0 +1,63 @@
+import { createClient } from "@/lib/supabase/server";
+import { createHash, randomBytes } from "crypto";
+
+export async function POST(request: Request) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const body = await request.json();
+  const name = typeof body.name === "string" ? body.name.trim() : "";
+
+  if (!name || name.length > 64) {
+    return Response.json(
+      { error: "Name is required (max 64 characters)" },
+      { status: 400 }
+    );
+  }
+
+  const rawKey = "sk-" + randomBytes(32).toString("hex");
+  const keyHash = createHash("sha256").update(rawKey).digest("hex");
+
+  const { data, error } = await supabase
+    .from("api_keys")
+    .insert({ user_id: user.id, key_hash: keyHash, name })
+    .select("id, name, created_at")
+    .single();
+
+  if (error) {
+    return Response.json({ error: "Failed to create key" }, { status: 500 });
+  }
+
+  return Response.json(
+    { key: rawKey, id: data.id, name: data.name },
+    { status: 201 }
+  );
+}
+
+export async function GET() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { data, error } = await supabase
+    .from("api_keys")
+    .select("id, name, created_at")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    return Response.json({ error: "Failed to fetch keys" }, { status: 500 });
+  }
+
+  return Response.json(data);
+}
