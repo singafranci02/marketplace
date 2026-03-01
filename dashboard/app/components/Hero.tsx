@@ -45,7 +45,7 @@ export function Hero({ agentCount, dealCount }: HeroProps) {
       {/* Subline */}
       <p
         className="text-xs sm:text-sm font-semibold tracking-widest uppercase mb-12"
-        style={{ color: "#555" }}
+        style={{ color: "#aaa" }}
       >
         VERIFIED.&nbsp;&nbsp;POLICY-ENFORCED.&nbsp;&nbsp;CRYPTOGRAPHICALLY SEALED.
       </p>
@@ -56,7 +56,7 @@ export function Hero({ agentCount, dealCount }: HeroProps) {
           <label
             htmlFor="search"
             className="absolute -top-5 left-0 text-xs tracking-widest uppercase"
-            style={{ color: "#555" }}
+            style={{ color: "#888" }}
           >
             SEARCH REGISTRY
           </label>
@@ -84,18 +84,18 @@ export function Hero({ agentCount, dealCount }: HeroProps) {
       {/* Stats strip */}
       <div
         className="flex items-center gap-8 mt-10 text-xs font-mono uppercase tracking-widest"
-        style={{ color: "#444" }}
+        style={{ color: "#888" }}
       >
         <span>
           <span className="text-white font-bold">{agentCount}</span>
           &nbsp;VERIFIED AGENTS
         </span>
-        <span style={{ color: "#1a1a1a" }}>|</span>
+        <span style={{ color: "#444" }}>|</span>
         <span>
           <span className="text-white font-bold">{dealCount}</span>
           &nbsp;DEALS EXECUTED
         </span>
-        <span style={{ color: "#1a1a1a" }}>|</span>
+        <span style={{ color: "#444" }}>|</span>
         <span>HMAC-SHA256 SIGNED</span>
       </div>
     </section>

@@ -20,7 +20,7 @@ function ComplianceBadge({ label }: { label: string }) {
   return (
     <span
       className="inline-block px-2 py-0.5 text-xs font-mono rounded-sm"
-      style={{ border: "1px solid #1a1a1a", color: "#555" }}
+      style={{ border: "1px solid #333", color: "#aaa" }}
     >
       {label}
     </span>
@@ -32,7 +32,7 @@ function CapabilityTag({ method }: { method: string }) {
   return (
     <span
       className="inline-block px-2 py-0.5 text-xs font-mono"
-      style={{ background: "#0a0a0a", border: "1px solid #1f1f1f", color: "#888" }}
+      style={{ background: "#0a0a0a", border: "1px solid #2a2a2a", color: "#bbb" }}
     >
       {short}
     </span>
@@ -47,12 +47,13 @@ export function AgentGrid({ agents }: { agents: AgentCard[] }) {
       style={{ borderTop: "1px solid #1a1a1a" }}
     >
       <div className="flex items-center justify-between mb-10">
-        <p className="text-xs font-semibold tracking-widest uppercase" style={{ color: "#555" }}>
+        <p className="text-xs font-semibold tracking-widest uppercase" style={{ color: "#888" }}>
           VERIFIED AGENTS
         </p>
-        <p className="text-xs font-mono" style={{ color: "#333" }}>
+        <p className="text-xs font-mono" style={{ color: "#666" }}>
           {agents.length} LISTED · ALL MARKETPLACE_SIGNED
         </p>
+
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -68,7 +69,7 @@ export function AgentGrid({ agents }: { agents: AgentCard[] }) {
                 <h3 className="text-sm font-bold tracking-wide uppercase">
                   {agent.name}
                 </h3>
-                <p className="text-xs mt-0.5" style={{ color: "#555" }}>
+                <p className="text-xs mt-0.5" style={{ color: "#aaa" }}>
                   {agent.owner}
                 </p>
               </div>
@@ -83,12 +84,12 @@ export function AgentGrid({ agents }: { agents: AgentCard[] }) {
             </div>
 
             {/* Legal ID */}
-            <p className="data" style={{ color: "#333" }}>
+            <p className="data" style={{ color: "#777" }}>
               {agent.legal_entity_id}
             </p>
 
             {/* Description */}
-            <p className="text-xs leading-relaxed" style={{ color: "#666" }}>
+            <p className="text-xs leading-relaxed" style={{ color: "#aaa" }}>
               {agent.description}
             </p>
 
@@ -111,7 +112,7 @@ export function AgentGrid({ agents }: { agents: AgentCard[] }) {
               className="flex items-center justify-between pt-2"
               style={{ borderTop: "1px solid #111" }}
             >
-              <p className="data" style={{ color: "#2a2a2a" }}>
+              <p className="data" style={{ color: "#666" }}>
                 {agent.endpoint.replace("https://", "")}
               </p>
               <a

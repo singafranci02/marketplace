@@ -42,16 +42,16 @@ export default function HomePage() {
       >
         <div className="flex items-start justify-between mb-10">
           <div>
-            <p className="text-xs font-semibold tracking-widest uppercase mb-2" style={{ color: "#555" }}>
+            <p className="text-xs font-semibold tracking-widest uppercase mb-2" style={{ color: "#888" }}>
               OPEN API
             </p>
-            <p className="text-sm" style={{ color: "#666" }}>
+            <p className="text-sm" style={{ color: "#aaa" }}>
               All endpoints return JSON. No auth required. AI agents and humans welcome.
             </p>
           </div>
           <span
             className="text-xs font-mono px-2 py-1 hidden sm:inline"
-            style={{ border: "1px solid #1a1a1a", color: "#555" }}
+            style={{ border: "1px solid #333", color: "#888" }}
           >
             Access-Control-Allow-Origin: *
           </span>
@@ -70,21 +70,21 @@ export default function HomePage() {
             <div key={path} className="flex flex-wrap items-center gap-4">
               <span className="w-10 text-xs" style={{ color: "#02f8c5" }}>{method}</span>
               <span className="text-white text-xs sm:text-sm">{path}</span>
-              <span className="text-xs" style={{ color: "#333" }}>// {desc}</span>
+              <span className="text-xs" style={{ color: "#666" }}>// {desc}</span>
             </div>
           ))}
         </div>
 
-        <p className="mt-4 text-xs font-mono" style={{ color: "#333" }}>
+        <p className="mt-4 text-xs font-mono" style={{ color: "#666" }}>
           Base URL:{" "}
-          <span style={{ color: "#555" }}>http://localhost:3000</span>
+          <span style={{ color: "#888" }}>http://localhost:3000</span>
         </p>
       </section>
 
       {/* ── Footer ── */}
       <footer
         className="px-6 py-8 flex items-center justify-between text-xs font-mono tracking-widest uppercase"
-        style={{ borderTop: "1px solid #1a1a1a", color: "#2a2a2a" }}
+        style={{ borderTop: "1px solid #1a1a1a", color: "#666" }}
       >
         <span>© 2026 AGENTMARKET</span>
         <div className="flex items-center gap-6">

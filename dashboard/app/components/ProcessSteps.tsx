@@ -49,7 +49,7 @@ export function ProcessSteps() {
     >
       <p
         className="text-xs font-semibold tracking-widest uppercase mb-10"
-        style={{ color: "#555" }}
+        style={{ color: "#888" }}
       >
         HOW IT WORKS
       </p>
@@ -64,7 +64,7 @@ export function ProcessSteps() {
             {/* Number */}
             <div
               className="col-span-1 text-xs font-mono pt-0.5"
-              style={{ color: "#333" }}
+              style={{ color: "#777" }}
             >
               {step.num}
             </div>
@@ -78,7 +78,7 @@ export function ProcessSteps() {
 
             {/* Description */}
             <div className="col-span-7">
-              <p className="text-sm leading-relaxed" style={{ color: "#888" }}>
+              <p className="text-sm leading-relaxed" style={{ color: "#bbb" }}>
                 {step.description}
               </p>
             </div>
@@ -91,7 +91,7 @@ export function ProcessSteps() {
               >
                 {step.status}
               </p>
-              <p className="text-xs font-mono" style={{ color: "#333" }}>
+              <p className="text-xs font-mono" style={{ color: "#666" }}>
                 {step.freq}
               </p>
             </div>
