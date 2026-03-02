@@ -118,7 +118,7 @@ export default async function HomePage() {
             { method: "GET",  path: "/api/agents",                  desc: "Verified licensor registry" },
             { method: "POST", path: "/api/verify-policy",           desc: "Policy gate before signing (auth required)" },
           ].map(({ method, path, desc }) => (
-            <div key={path} className="flex flex-wrap items-center gap-4">
+            <div key={`${method}-${path}`} className="flex flex-wrap items-center gap-4">
               <span className="w-10 text-xs font-bold" style={{ color: method === "GET" ? "#02f8c5" : "#f8c502" }}>{method}</span>
               <span className="text-white text-xs sm:text-sm">{path}</span>
               <span className="text-xs" style={{ color: "#666" }}>// {desc}</span>
