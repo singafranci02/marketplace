@@ -1,6 +1,11 @@
 /**
- * chain-listener.ts — A2A On-Chain Settlement Listener
- * ======================================================
+ * chain-listener.ts — DEPRECATED (Phase 28: Solana Pivot)
+ * =========================================================
+ * Replaced by solana-listener.ts (Solana/Anchor + cNFT).
+ * Kept for EVM history reference only — do not run.
+ *
+ * chain-listener.ts — A2A On-Chain Settlement Listener (EVM/Base Sepolia)
+ * =========================================================================
  * Polls Base Sepolia for FundsLocked events on the A2AClearinghouse contract.
  * When a FundsLocked event is detected, finds the matching Supabase license
  * (via keccak256(artifact_id) === event.taskId) and promotes it from

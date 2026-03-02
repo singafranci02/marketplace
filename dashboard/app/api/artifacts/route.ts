@@ -3,7 +3,7 @@ import { join } from "path";
 import { verify as cryptoVerify, createHash } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
-import { verifyTransaction } from "@/lib/chain";
+import { verifyTransaction } from "@/lib/solana";
 
 const DB_PATH = join(process.cwd(), "..", "database.json");
 

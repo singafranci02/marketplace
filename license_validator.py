@@ -125,9 +125,27 @@ def _pad_b64(s: str) -> str:
 
 def _get_hardware_id() -> str:
     """Return a stable SHA-256 fingerprint of this machine's MAC address.
-    Matches the value embedded in DealArtifact.terms.hardware_id during negotiation.
+    Used as backward-compat fallback for pre-Phase 28 licenses.
     """
     return hashlib.sha256(str(uuid.getnode()).encode()).hexdigest()
+
+
+def _get_solana_pubkey(agent_id: str, db_path: Optional[str] = None) -> Optional[str]:
+    """Return the agent's Solana pubkey from database.json, or None if not found.
+    Used for Phase 28 cNFT token-gating: checks that this agent still holds the license NFT.
+    """
+    import json
+    from pathlib import Path
+    try:
+        path = Path(db_path) if db_path else Path(__file__).parent / "database.json"
+        with open(path) as f:
+            db = json.load(f)
+        for agent in db.get("agents", []):
+            if agent.get("agent_id") == agent_id:
+                return agent.get("solana_pubkey")
+    except Exception:
+        pass
+    return None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -195,9 +213,13 @@ class LicenseValidator:
         Check license validity via /api/license/check (no download quota cost).
         Returns True if a valid, non-expired, non-revoked license exists.
 
-        If verify_hardware=True (default) and the license contains a hardware_id,
-        the local machine fingerprint is compared and SecurityException is raised
-        on mismatch — halting execution before any key retrieval attempt.
+        Phase 28: cNFT token-gating check.
+          If the license carries a cnft_asset_id, the token_holder field is compared
+          against this agent's Solana pubkey. Raises SecurityException on mismatch —
+          meaning the license NFT was transferred (resold) and this agent lost access.
+
+        Phase 27 backward compat: if no cnft_asset_id but a hardware_id exists, the
+          hardware check is performed as a fallback.
         """
         try:
             resp = requests.get(
@@ -209,14 +231,26 @@ class LicenseValidator:
             if resp.status_code != 200:
                 return False
             data = resp.json()
-            # Phase 27: hardware binding check
-            if verify_hardware and data.get("hardware_id"):
+
+            # Phase 28: cNFT token-gating check (primary)
+            if data.get("cnft_asset_id") and data.get("token_holder"):
+                local_wallet = _get_solana_pubkey(self.agent_id)
+                if local_wallet and local_wallet != data["token_holder"]:
+                    raise SecurityException(
+                        "[LICENSE DENIED] cNFT ownership mismatch — this license NFT is no "
+                        "longer held by this agent. If the NFT was transferred or sold, access "
+                        "has been revoked. Contact the original licensor."
+                    )
+
+            # Phase 27 backward compat: hardware binding (for pre-Phase 28 licenses)
+            elif verify_hardware and data.get("hardware_id"):
                 local_hw = _get_hardware_id()
                 if local_hw != data["hardware_id"]:
                     raise SecurityException(
                         "[LICENSE DENIED] Hardware ID mismatch — this license is bound "
                         "to a different machine. Contact the licensor to transfer the license."
                     )
+
             return bool(data.get("valid"))
         except SecurityException:
             raise

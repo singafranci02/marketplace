@@ -43,6 +43,7 @@
         "base_fee_usd": 250
       },
       "wallet_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+      "solana_pubkey": "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM",
       "verified": true,
       "joined_at": "2025-01-15T09:00:00Z"
     },
@@ -85,6 +86,7 @@
         "base_fee_usd": 180
       },
       "wallet_address": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+      "solana_pubkey": "BrEqc6zHVR2gqFcRKhfRdZTLGqBkVEEFGhN9rJQfkiLK",
       "verified": true,
       "joined_at": "2025-02-03T11:30:00Z"
     },
@@ -131,6 +133,7 @@
         "base_fee_usd": 500
       },
       "wallet_address": "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
+      "solana_pubkey": "DRpbCBMxVnDK7mVeX6ZfGBzT5Z1GqHQTp3h1X9YvQgPH",
       "verified": true,
       "joined_at": "2025-01-28T14:45:00Z"
     },
@@ -168,6 +171,7 @@
       "endpoint": "https://agents.acmecorp.com/a2a",
       "pricing": null,
       "wallet_address": "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65",
+      "solana_pubkey": "HXtBm8XZbxaTt41uqaKhwUAa6Z1UryvFPHBhZFMNTe3e",
       "verified": true,
       "joined_at": "2025-01-01T00:00:00Z"
     }

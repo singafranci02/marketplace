@@ -50,7 +50,7 @@ export async function GET(request: Request) {
   // Find the most recent license (any status) for this vault + agent
   const { data: license, error: licErr } = await svc
     .from("ip_licenses")
-    .select("id, status, created_at, custom_terms, artifact_id")
+    .select("id, status, created_at, custom_terms, artifact_id, cnft_asset_id, token_holder")
     .eq("vault_id", vault_id)
     .eq("licensee_agent_id", agent_id)
     .not("artifact_id", "is", null)
@@ -71,7 +71,7 @@ export async function GET(request: Request) {
   }
 
   // Expiry check
-  const terms     = license.custom_terms as { license_days?: number; hardware_id?: string } | null;
+  const terms = license.custom_terms as { license_days?: number; hardware_id?: string } | null;
   const licenseDays = terms?.license_days ?? 0;
   let expiresAt: string | null = null;
 
@@ -100,12 +100,16 @@ export async function GET(request: Request) {
 
   return Response.json(
     {
-      valid:        true,
-      license_id:   license.id,
-      status:       license.status,
-      expires_at:   expiresAt,
+      valid:          true,
+      license_id:     license.id,
+      status:         license.status,
+      expires_at:     expiresAt,
       tx_verified,
-      hardware_id:  terms?.hardware_id ?? null,
+      // Phase 28: cNFT token-gating fields
+      cnft_asset_id:  (license as { cnft_asset_id?: string }).cnft_asset_id ?? null,
+      token_holder:   (license as { token_holder?: string }).token_holder ?? null,
+      // Phase 27 backward compat
+      hardware_id:    terms?.hardware_id ?? null,
     },
     { headers: CORS }
   );

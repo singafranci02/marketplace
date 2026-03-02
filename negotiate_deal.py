@@ -157,25 +157,45 @@ class DealArtifact:
     issued_at: str        = dataclasses.field(
         default_factory=lambda: datetime.datetime.utcnow().isoformat() + "Z"
     )
-    tx_hash: str | None   = None  # Base Sepolia tx hash — optional, for on-chain payment proof
+    tx_hash: str | None          = None  # Solana tx signature (base58) — optional, for on-chain payment proof
+    buyer_solana_wallet: str     = ""   # Buyer's Solana pubkey (base58) — used for cNFT token-gating
 
     def canonical_body(self) -> bytes:
         """Deterministic JSON serialisation for signing (no signatures field)."""
         body = {
-            "artifact_id":    self.artifact_id,
-            "task_id":        self.task_id,
-            "artifact_type":  self.artifact_type,
-            "schema_version": self.schema_version,
-            "status":         self.status,
-            "parties":        self.parties,
-            "terms":          self.terms,
-            "policy_check":   self.policy_check,
-            "issued_at":      self.issued_at,
+            "artifact_id":          self.artifact_id,
+            "task_id":              self.task_id,
+            "artifact_type":        self.artifact_type,
+            "schema_version":       self.schema_version,
+            "status":               self.status,
+            "parties":              self.parties,
+            "terms":                self.terms,
+            "policy_check":         self.policy_check,
+            "issued_at":            self.issued_at,
+            "buyer_solana_wallet":  self.buyer_solana_wallet,
         }
         return json.dumps(body, sort_keys=True, separators=(",", ":")).encode()
 
     def to_dict(self) -> dict:
         return dataclasses.asdict(self)
+
+
+# ---------------------------------------------------------------------------
+# Solana helpers
+# ---------------------------------------------------------------------------
+
+def _get_agent_solana_pubkey(agent_id: str) -> str:
+    """Return the agent's Solana pubkey from database.json, or empty string if not found."""
+    try:
+        db_path = Path(__file__).parent / "database.json"
+        with open(db_path) as f:
+            db = json.load(f)
+        for agent in db.get("agents", []):
+            if agent.get("agent_id") == agent_id:
+                return agent.get("solana_pubkey", "")
+    except Exception:
+        pass
+    return ""
 
 
 # ---------------------------------------------------------------------------
@@ -656,17 +676,27 @@ def generate_signed_artifact(
     Both parties sign the canonical body with Ed25519 (per-agent private key).
     agreed_price is the negotiated rev share %.
     """
+    # Phase 28: task_id = sha256(artifact_id) — matches the Anchor PDA seed in the Solana program.
+    # Compute here so the artifact carries the on-chain task_id for verification.
+    artifact_id = f"artifact-{uuid.uuid4()}"
+    solana_task_id = hashlib.sha256(artifact_id.encode()).hexdigest()
+
+    # Buyer's Solana pubkey (read from database.json for cNFT token-gating)
+    buyer_solana_wallet = _get_agent_solana_pubkey(buyer.agent_id)
+
     artifact = DealArtifact(
-        artifact_id = f"artifact-{uuid.uuid4()}",
-        task_id     = task_id,
+        artifact_id         = artifact_id,
+        task_id             = task_id,
+        buyer_solana_wallet = buyer_solana_wallet,
         parties = {
             "licensee": {
-                "agent_id": buyer.agent_id,
-                "company":  buyer.company,
+                "agent_id":     buyer.agent_id,
+                "company":      buyer.company,
+                "solana_pubkey": buyer_solana_wallet,
             },
             "licensor": {
-                "agent_id": seller.agent_id,
-                "company":  seller.company,
+                "agent_id":        seller.agent_id,
+                "company":         seller.company,
                 "legal_entity_id": "AU-ABN-51824753556",
             },
         },
@@ -675,15 +705,14 @@ def generate_signed_artifact(
             "ipfs_hash":     VAULT_IPFS_HASH,
             "rev_share_pct": agreed_price,
             "license_days":  LICENSE_DAYS,
-            "currency":      "USD",
+            # Phase 28: SOL denomination; solana_task_id for on-chain PDA matching.
+            "currency":            "SOL",
+            "solana_task_id":      solana_task_id,
             "performance_triggers": [
-                {"pnl_threshold_eth": 10, "new_rev_share_pct": agreed_price + 5}
+                {"pnl_threshold_sol": 10, "new_rev_share_pct": agreed_price + 5}
             ],
             "start_date":    datetime.datetime.utcnow().date().isoformat(),
             "cancellation_notice_days": 3,
-            # Phase 27: hardware binding — SHA-256 of buyer's MAC address.
-            # Covered by both Ed25519 signatures; validated by license_validator.py.
-            "hardware_id":   hashlib.sha256(str(uuid.getnode()).encode()).hexdigest(),
         },
         policy_check = policy_result,
     )

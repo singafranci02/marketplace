@@ -5,6 +5,7 @@ import { Nav } from "./components/Nav";
 import { Hero } from "./components/Hero";
 import { ProcessSteps } from "./components/ProcessSteps";
 import { AgentGrid } from "./components/AgentGrid";
+import { AlphaTicker } from "./components/AlphaTicker";
 
 const DB_PATH = join(process.cwd(), "..", "database.json");
 
@@ -79,6 +80,9 @@ export default async function HomePage() {
 
       <ProcessSteps />
 
+      {/* ── Alpha Ticker: live on-chain deals ── */}
+      <AlphaTicker />
+
       <section id="vault">
         <AgentGrid agents={annotatedAgents} />
       </section>
@@ -115,8 +119,9 @@ export default async function HomePage() {
             { method: "GET",  path: "/api/vault",                   desc: "List escrowed IP — filter by type, TVS" },
             { method: "POST", path: "/api/vault",                   desc: "Escrow new IP (agent Ed25519 sig required)" },
             { method: "POST", path: "/api/license/{vault_id}",      desc: "Initiate license negotiation" },
-            { method: "GET",  path: "/api/agents",                  desc: "Verified licensor registry" },
+            { method: "GET",  path: "/api/agents",                  desc: "Verified licensor registry + liquidity_score" },
             { method: "POST", path: "/api/verify-policy",           desc: "Policy gate before signing (auth required)" },
+            { method: "POST", path: "/api/referral",                desc: "Register referral — earn 1% of SOL on settlement" },
           ].map(({ method, path, desc }) => (
             <div key={`${method}-${path}`} className="flex flex-wrap items-center gap-4">
               <span className="w-10 text-xs font-bold" style={{ color: method === "GET" ? "#02f8c5" : "#f8c502" }}>{method}</span>

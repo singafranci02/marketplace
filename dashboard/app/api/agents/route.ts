@@ -63,18 +63,37 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // ── Liveness filter ─────────────────────────────────────────────────────
+  // ── Liveness + Liquidity Score ───────────────────────────────────────────
   const serviceUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  const heartbeatMap: Record<string, string> = {};
+  const heartbeatMap:       Record<string, string> = {};
+  const liquidityMap:       Record<string, number> = {};  // agent_id → total lamports processed
+
   if (serviceUrl && serviceKey) {
     const svc = createServiceClient(serviceUrl, serviceKey);
-    const { data } = await svc
+
+    // Heartbeats
+    const { data: hbData } = await svc
       .from("agent_heartbeats")
       .select("agent_id, last_seen_at");
-    for (const row of data ?? []) {
+    for (const row of hbData ?? []) {
       heartbeatMap[row.agent_id] = row.last_seen_at;
+    }
+
+    // Liquidity Score: sum amount_lamports per seller agent from verified ledger entries
+    const { data: ledgerData } = await svc
+      .from("ledger")
+      .select("artifact, amount_lamports")
+      .eq("on_chain_status", "VERIFIED_ON_CHAIN")
+      .not("amount_lamports", "is", null);
+
+    for (const row of ledgerData ?? []) {
+      const artifact = row.artifact as { parties?: { licensor?: { agent_id?: string } } };
+      const sellerId = artifact?.parties?.licensor?.agent_id;
+      if (sellerId && row.amount_lamports) {
+        liquidityMap[sellerId] = (liquidityMap[sellerId] ?? 0) + Number(row.amount_lamports);
+      }
     }
   }
 
@@ -83,18 +102,23 @@ export async function GET(req: NextRequest) {
   const hasAnyHeartbeat = Object.keys(heartbeatMap).length > 0;
 
   const annotated = results.map((a) => {
-    const lastSeen = heartbeatMap[a["agent_id"] as string];
-    const active = hasAnyHeartbeat
+    const agentId  = a["agent_id"] as string;
+    const lastSeen = heartbeatMap[agentId];
+    const active   = hasAnyHeartbeat
       ? (lastSeen ? now - new Date(lastSeen).getTime() < STALE_MS : false)
       : true;
+    const lamports          = liquidityMap[agentId] ?? 0;
+    const liquidity_score_sol = (lamports / 1e9).toFixed(4);
+
     return {
       ...a,
-      status:    active ? "ACTIVE" : "INACTIVE",
-      last_seen: lastSeen ?? null,
+      status:              active ? "ACTIVE" : "INACTIVE",
+      last_seen:           lastSeen ?? null,
+      liquidity_score_sol, // Phase 28: total SOL processed through the clearinghouse
     };
   });
 
-  const active       = annotated.filter((a) => a.status === "ACTIVE");
+  const active        = annotated.filter((a) => a.status === "ACTIVE");
   const inactiveCount = annotated.length - active.length;
 
   return Response.json(

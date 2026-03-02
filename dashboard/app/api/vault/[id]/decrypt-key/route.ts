@@ -7,7 +7,7 @@ import {
 } from "crypto";
 import { readFileSync, existsSync } from "fs";
 import { join } from "path";
-import { verifyTransaction } from "@/lib/chain";
+import { verifyTransaction } from "@/lib/solana";
 
 const CORS    = { "Access-Control-Allow-Origin": "*" };
 const DB_PATH = join(process.cwd(), "..", "database.json");
@@ -131,7 +131,14 @@ export async function GET(
   }
 
   // ── Layer 1: Expiry gate ─────────────────────────────────────────────────────
-  const terms     = license.custom_terms as { license_days?: number; max_key_downloads_per_day?: number; hardware_id?: string } | null;
+  const terms = license.custom_terms as {
+    license_days?: number;
+    max_key_downloads_per_day?: number;
+    hardware_id?: string;
+    // Phase 28 cNFT fields (set by solana-listener.ts):
+    cnft_asset_id?: string;
+    token_holder?: string;
+  } | null;
   const licenseDays = terms?.license_days ?? 0;
   if (licenseDays > 0 && license.created_at) {
     const expiry = new Date(license.created_at as string);
@@ -225,11 +232,26 @@ export async function GET(
     // tx_hash is null → off-chain payment → allow
   }
 
-  // ── Layer 5: Hardware binding gate ───────────────────────────────────────────
-  // If the license carries a hardware_id (set during negotiation by the buyer's machine),
-  // the request must include a matching X-Hardware-ID header. Licenses without a
-  // hardware_id are unaffected — backward compatible with pre-Phase 27 licenses.
-  if (terms?.hardware_id) {
+  // ── Layer 5: Access control gate ─────────────────────────────────────────────
+  // Phase 28 (cNFT token-gating): if the license has a cnft_asset_id, the
+  // token_holder must match the requesting agent's registered Solana pubkey.
+  // Licenses with no cnft_asset_id fall back to Phase 27 hardware binding.
+  // Licenses with neither field pass through unchanged (backward compatible).
+  if (terms?.cnft_asset_id && terms?.token_holder) {
+    const { data: agentRecord } = await svc
+      .from("agents")
+      .select("solana_pubkey")
+      .eq("agent_id", agent_id)
+      .maybeSingle();
+    const agentSolanaPubkey = agentRecord?.solana_pubkey ?? null;
+    if (!agentSolanaPubkey || agentSolanaPubkey !== terms.token_holder) {
+      return Response.json(
+        { error: "cNFT ownership mismatch. This license NFT is no longer held by this agent." },
+        { status: 403, headers: CORS }
+      );
+    }
+  } else if (terms?.hardware_id) {
+    // Phase 27 backward compat: hardware binding for pre-Phase 28 licenses
     const sentHwId = request.headers.get("X-Hardware-ID");
     if (!sentHwId || sentHwId !== terms.hardware_id) {
       return Response.json(
