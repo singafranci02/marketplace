@@ -81,6 +81,7 @@ const STATUS_COLOR: Record<string, string> = {
   SIGNED:    "#02f8c5",
   EXECUTING: "#ffffff",
   SETTLED:   "#888",
+  REVOKED:   "#ff4444",
 };
 
 function short(id: string | null | undefined, len = 8): string {
