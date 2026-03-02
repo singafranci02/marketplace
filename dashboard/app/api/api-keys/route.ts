@@ -21,12 +21,19 @@ export async function POST(request: Request) {
     );
   }
 
+  if (body.tos_accepted !== true) {
+    return Response.json(
+      { error: "Terms of Use must be accepted before generating a key" },
+      { status: 403 }
+    );
+  }
+
   const rawKey = "sk-" + randomBytes(32).toString("hex");
   const keyHash = createHash("sha256").update(rawKey).digest("hex");
 
   const { data, error } = await supabase
     .from("api_keys")
-    .insert({ user_id: user.id, key_hash: keyHash, name })
+    .insert({ user_id: user.id, key_hash: keyHash, name, tos_accepted_at: new Date().toISOString() })
     .select("id, name, created_at")
     .single();
 

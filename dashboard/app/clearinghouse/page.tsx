@@ -3,6 +3,7 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 import { Nav } from "../components/Nav";
 import Link from "next/link";
+import { getEthBalance } from "@/lib/chain";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -24,6 +25,9 @@ interface IpVault {
   escrow_eth: number;
   status: string;
   created_at: string;
+  wallet_address: string | null;
+  content_key_encrypted: string | null;
+  eth_balance?: string | null;
 }
 
 interface IpLicense {
@@ -108,7 +112,7 @@ export default async function ClearinghousePage({
   const svc = createServiceClient(serviceUrl, serviceKey);
 
   // Fetch data needed for all tabs in parallel
-  const [{ data: vaults }, { data: licenses }] = await Promise.all([
+  const [{ data: vaults }, { data: licenses }, { data: attestations }] = await Promise.all([
     svc
       .from("ip_vault")
       .select("*")
@@ -120,10 +124,36 @@ export default async function ClearinghousePage({
       .select("*")
       .order("created_at", { ascending: false })
       .limit(100),
+    svc
+      .from("performance_attestations")
+      .select("id, license_id, licensee_agent_id, pnl_eth, rev_share_triggered, created_at")
+      .order("created_at", { ascending: false })
+      .limit(200),
   ]);
 
-  const allVaults   = (vaults   ?? []) as IpVault[];
+  const rawVaults   = (vaults   ?? []) as IpVault[];
   const allLicenses = (licenses ?? []) as IpLicense[];
+  const allAttestations = (attestations ?? []) as {
+    id: string;
+    license_id: string;
+    licensee_agent_id: string;
+    pnl_eth: number;
+    rev_share_triggered: number | null;
+    created_at: string;
+  }[];
+
+  // Fetch on-chain ETH balances for vaults with wallet_address
+  const allVaults = await Promise.all(
+    rawVaults.map(async (v) => {
+      if (!v.wallet_address) return { ...v, eth_balance: null };
+      try {
+        const eth_balance = await getEthBalance(v.wallet_address as `0x${string}`);
+        return { ...v, eth_balance };
+      } catch {
+        return { ...v, eth_balance: null };
+      }
+    })
+  );
 
   // Filter vaults for browser tab
   const filteredVaults = typeFilter
@@ -249,16 +279,26 @@ export default async function ClearinghousePage({
                       style={{ border: "1px solid #1a1a1a", background: "#030303" }}
                     >
                       {/* Badge + status */}
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
                         <span
                           className="text-xs font-mono px-2 py-0.5"
                           style={{ color, border: `1px solid ${color}33`, background: `${color}0d` }}
                         >
                           {TYPE_LABEL[vault.ip_type] ?? vault.ip_type.toUpperCase()}
                         </span>
-                        <span className="text-xs font-mono uppercase" style={{ color: "#02f8c5" }}>
-                          ● ACTIVE
-                        </span>
+                        <div className="flex items-center gap-2">
+                          {vault.content_key_encrypted && (
+                            <span
+                              className="text-xs font-mono px-2 py-0.5"
+                              style={{ color: "#a855f7", border: "1px solid #a855f722", background: "#a855f708" }}
+                            >
+                              ⊛ ENCRYPTED
+                            </span>
+                          )}
+                          <span className="text-xs font-mono uppercase" style={{ color: "#02f8c5" }}>
+                            ● ACTIVE
+                          </span>
+                        </div>
                       </div>
 
                       {/* Title */}
@@ -307,6 +347,27 @@ export default async function ClearinghousePage({
                           OWNER: {short(vault.owner_agent_id, 16)}
                         </p>
                       </div>
+
+                      {/* On-chain wallet */}
+                      {vault.wallet_address && (
+                        <div className="text-xs font-mono space-y-1">
+                          <p style={{ color: "#555" }}>
+                            WALLET:{" "}
+                            <span style={{ color: "#02f8c5" }}>
+                              {vault.wallet_address.slice(0, 6)}…{vault.wallet_address.slice(-4)}
+                            </span>
+                          </p>
+                          <p style={{ color: "#555" }}>
+                            ON-CHAIN:{" "}
+                            <span style={{ color: vault.eth_balance && vault.eth_balance !== "0" ? "#02f8c5" : "#444" }}>
+                              {vault.eth_balance !== null && vault.eth_balance !== undefined
+                                ? `${vault.eth_balance} ETH`
+                                : "—"}{" "}
+                            </span>
+                            <span style={{ color: "#333" }}>⬡ BASE SEPOLIA</span>
+                          </p>
+                        </div>
+                      )}
 
                       {/* Escrow + action */}
                       <div
@@ -396,15 +457,67 @@ export default async function ClearinghousePage({
             {/* Summary */}
             <div className="grid grid-cols-3 gap-4 mb-8">
               {[
-                { label: "SETTLED LICENSES", value: settledCount,    color: "#888" },
-                { label: "EXECUTING NOW",    value: executingCount,  color: "#fff" },
-                { label: "AWAITING SIGN",    value: allLicenses.filter(l => l.status === "DRAFT").length, color: "#555" },
+                { label: "SETTLED LICENSES",    value: settledCount,    color: "#888" },
+                { label: "EXECUTING NOW",        value: executingCount,  color: "#fff" },
+                { label: "ATTESTATIONS FILED",  value: allAttestations.length, color: "#02f8c5" },
               ].map(({ label, value, color }) => (
                 <div key={label} className="px-5 py-4" style={{ border: "1px solid #1a1a1a", background: "#030303" }}>
                   <p className="text-xs font-mono tracking-widest uppercase" style={{ color: "#888" }}>{label}</p>
                   <p className="mt-2 text-2xl font-black tracking-tight" style={{ color }}>{value}</p>
                 </div>
               ))}
+            </div>
+
+            {/* Performance Attestations */}
+            {allAttestations.length > 0 && (
+              <>
+                <p className="text-xs font-mono tracking-widest uppercase mb-4" style={{ color: "#888" }}>
+                  PERFORMANCE ATTESTATIONS
+                </p>
+                <div className="overflow-x-auto mb-8" style={{ border: "1px solid #1a1a1a" }}>
+                  <table className="min-w-full text-xs font-mono">
+                    <thead style={{ borderBottom: "1px solid #1a1a1a" }}>
+                      <tr>
+                        {["LICENSE", "AGENT", "PNL (ETH)", "REV SHARE TRIGGER", "DATE"].map(h => (
+                          <th key={h} className="px-4 py-3 text-left tracking-widest uppercase" style={{ color: "#555", fontWeight: 600 }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allAttestations.map(a => (
+                        <tr key={a.id} style={{ borderTop: "1px solid #0d0d0d" }}>
+                          <td className="px-4 py-3" style={{ color: "#666" }}>{short(a.license_id)}</td>
+                          <td className="px-4 py-3" style={{ color: "#aaa" }}>{short(a.licensee_agent_id, 16)}</td>
+                          <td className="px-4 py-3 font-bold text-white">{a.pnl_eth} ETH</td>
+                          <td className="px-4 py-3">
+                            {a.rev_share_triggered !== null ? (
+                              <span style={{ color: "#f8c502" }}>▲ {a.rev_share_triggered}% (TRIGGERED)</span>
+                            ) : (
+                              <span style={{ color: "#555" }}>— no trigger</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3" style={{ color: "#666" }}>{fmtDate(a.created_at)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+
+            {/* How to attest */}
+            <div className="mb-8 p-5" style={{ border: "1px solid #1a1a1a", background: "#030303" }}>
+              <p className="text-xs font-mono tracking-widest uppercase mb-2" style={{ color: "#888" }}>SUBMIT PERFORMANCE ATTESTATION</p>
+              <p className="text-xs font-mono" style={{ color: "#666" }}>
+                Licensee agents sign an Ed25519 attestation over{" "}
+                <code style={{ color: "#02f8c5" }}>{"{ license_id, pnl_eth, timestamp }"}</code>{" "}
+                and POST to{" "}
+                <code style={{ color: "#02f8c5" }}>POST /api/performance-attest</code>.
+                If PnL crosses a performance trigger threshold, rev share is auto-adjusted.
+              </p>
+              <p className="text-xs font-mono mt-2" style={{ color: "#444" }}>
+                Self-reported · future upgrade: Chainlink / Pyth oracle auto-verification
+              </p>
             </div>
 
             {/* Settled table */}

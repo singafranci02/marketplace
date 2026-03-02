@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ToSModal } from "./ToSModal";
 
 interface ApiKey {
   id: string;
@@ -22,9 +23,14 @@ export function ApiKeyManager({ initialKeys }: { initialKeys: ApiKey[] }) {
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [revoking, setRevoking] = useState<string | null>(null);
+  const [showTos, setShowTos] = useState(false);
+
+  function handleGenerateClick() {
+    if (!keyName.trim()) return;
+    setShowTos(true);
+  }
 
   async function generateKey() {
-    if (!keyName.trim()) return;
     setLoading(true);
     setError(null);
     setNewKey(null);
@@ -32,7 +38,7 @@ export function ApiKeyManager({ initialKeys }: { initialKeys: ApiKey[] }) {
     const res = await fetch("/api/api-keys", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: keyName.trim() }),
+      body: JSON.stringify({ name: keyName.trim(), tos_accepted: true }),
     });
 
     if (!res.ok) {
@@ -68,6 +74,15 @@ export function ApiKeyManager({ initialKeys }: { initialKeys: ApiKey[] }) {
 
   return (
     <div className="space-y-6">
+      <ToSModal
+        open={showTos}
+        onClose={() => setShowTos(false)}
+        onAccept={() => {
+          setShowTos(false);
+          generateKey();
+        }}
+      />
+
       {/* New key reveal */}
       {newKey && (
         <div
@@ -115,13 +130,13 @@ export function ApiKeyManager({ initialKeys }: { initialKeys: ApiKey[] }) {
             type="text"
             value={keyName}
             onChange={(e) => setKeyName(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && generateKey()}
+            onKeyDown={(e) => e.key === "Enter" && handleGenerateClick()}
             placeholder="KEY NAME  ·  e.g. production-agent"
             className="flex-1 bg-transparent text-white font-mono text-xs px-4 py-3 outline-none"
             style={{ border: "1px solid #1a1a1a" }}
           />
           <button
-            onClick={generateKey}
+            onClick={handleGenerateClick}
             disabled={loading || !keyName.trim()}
             className="px-6 py-3 text-xs font-bold tracking-widest uppercase text-black bg-white hover:bg-[#02f8c5] transition-colors duration-150 disabled:opacity-40 whitespace-nowrap"
           >

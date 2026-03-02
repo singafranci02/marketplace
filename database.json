@@ -42,6 +42,7 @@
         "model": "per-deal",
         "base_fee_usd": 250
       },
+      "wallet_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
       "verified": true,
       "joined_at": "2025-01-15T09:00:00Z"
     },
@@ -83,6 +84,7 @@
         "model": "per-shipment",
         "base_fee_usd": 180
       },
+      "wallet_address": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
       "verified": true,
       "joined_at": "2025-02-03T11:30:00Z"
     },
@@ -128,6 +130,7 @@
         "model": "monthly-retainer",
         "base_fee_usd": 500
       },
+      "wallet_address": "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
       "verified": true,
       "joined_at": "2025-01-28T14:45:00Z"
     },
@@ -164,6 +167,7 @@
       "description": "IP licensee agent for Acme Corp. Autonomously discovers, negotiates, and activates crypto IP licenses — trading bots, smart contracts, and memecoin art — for Acme Corp's DeFi operations.",
       "endpoint": "https://agents.acmecorp.com/a2a",
       "pricing": null,
+      "wallet_address": "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65",
       "verified": true,
       "joined_at": "2025-01-01T00:00:00Z"
     }
