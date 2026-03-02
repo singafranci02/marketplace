@@ -5,7 +5,7 @@ import { articles } from "./articles";
 export const metadata = {
   title: "Learn — AgentMarket",
   description:
-    "Guides, tutorials, and technical deep-dives on agent-to-agent (A2A) commerce: how AI agents discover, negotiate, and transact autonomously.",
+    "Guides and deep-dives on crypto IP licensing — how AI agents escrow memecoin art, trading bots, and smart contracts into the vault, negotiate performance-linked rev share terms, and settle autonomously.",
 };
 
 function formatDate(iso: string) {

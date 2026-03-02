@@ -16,366 +16,342 @@ export interface Article {
 
 export const articles: Article[] = [
   {
-    slug: "what-is-agent-to-agent-commerce",
-    title: "What Is Agent-to-Agent Commerce?",
+    slug: "what-is-crypto-ip-licensing",
+    title: "What Is Crypto IP Licensing?",
     description:
-      "Autonomous AI agents can now discover, negotiate, and sign contracts with each other — without human intervention at runtime. This is agent-to-agent (A2A) commerce.",
-    date: "2025-03-01",
-    tags: ["A2A Protocol", "Overview", "Autonomous Agents"],
-    readingTime: "5 min read",
+      "Memecoins and DeFi bots are forked daily with no attribution and no rev share. The IP Vault fixes this — a marketplace where creators escrow crypto assets under machine-enforceable license terms.",
+    date: "2026-03-01",
+    tags: ["IP Vault", "Overview", "Agent-Native"],
+    readingTime: "4 min read",
     body: [
       {
-        heading: "The Shift from Human-Mediated to Agent-Mediated Transactions",
+        heading: "The Problem With Traditional IP",
         content:
-          "Traditional software integrations require a human to negotiate a contract, sign a service agreement, and configure credentials. AI agents change this entirely. An agent can be given a budget, a set of goals, and a policy rulebook — then left to discover, evaluate, and transact with other agents on its own. Agent-to-agent (A2A) commerce is the infrastructure that makes this safe, auditable, and reversible.",
+          "In the crypto world, IP is copied constantly. A trading bot that took months to tune gets forked in minutes. A memecoin art pack is ripped from GitHub and relaunched on a competing token. A Solidity contract template is copied with the attribution comment deleted. Traditional IP law is too slow and too expensive to enforce in an environment where assets move at blockchain speed. Creators have no mechanism to prove they made something first, or to collect when their work generates value for others.",
       },
       {
-        heading: "What Does an A2A Transaction Look Like?",
+        heading: "Enter the IP Vault",
         content:
-          "A buyer agent — say, a procurement bot running inside an enterprise — identifies a need: it needs SaaS tooling for 10 seats. It queries a marketplace registry to find seller agents that offer the relevant capability. It evaluates their compliance certifications and pricing. It submits a proposed deal to the seller's policy endpoint, which validates it against internal rules. If approved on both sides, both agents co-sign a cryptographic artifact that is recorded immutably on a shared ledger. No human clicks 'approve'.",
+          "The IP Vault is a marketplace where creators escrow crypto assets under machine-enforceable license terms. Trading bots, memecoin art packs, smart contract templates, and narrative assets are uploaded to IPFS, content-addressed with a CID, and escrowed into the vault alongside a license template. The license template specifies rev share percentage, duration, maximum licensees, and minimum TVS (total value settled). Any agent that wants to use the IP must negotiate and activate a license — autonomously, without a lawyer.",
       },
       {
-        heading: "The Core Components of A2A Commerce",
+        heading: "What Kinds of IP Can You Escrow?",
         content:
-          "Four components make A2A commerce work: (1) a registry of verified agents with machine-readable Agent Cards, (2) a policy engine that enforces spending limits and compliance rules at signing time, (3) a cryptographic signing protocol so each party can prove they consented to the deal, and (4) an audit ledger that preserves the signed artifact forever. AgentMarket implements all four.",
+          "The vault currently supports four IP types. trading_bot: MEV scripts, launch snipers, and DeFi automation strategies. memecoin_art: Layered PNG/SVG packs, brand identity kits, and character IP for token launches. smart_contract: Audited Solidity templates for bonding curves, liquidity locks, and token launches. narrative: Lore packs, community storylines, and worldbuilding IP licensed for derivative projects. Each type gets an IPFS CID as its content address. The CID changes if a single byte of the asset changes — making content authenticity cryptographically verifiable.",
       },
       {
-        heading: "Why It Matters for LLMs and AI Systems",
+        heading: "Agent-Native by Design",
         content:
-          "Large language models and agentic frameworks (AutoGPT, Claude, GPT-4o, Gemini) can now be given tool access to a marketplace API. With a single API key and a few HTTP calls, any LLM-powered agent can participate in A2A commerce: discover capabilities, negotiate terms, and execute binding agreements — all in natural-language-driven pipelines. The marketplace acts as the trust layer, so individual agents don't need to implement cryptography or compliance logic themselves.",
+          "No humans need to be involved at runtime. A creator agent escrows IP via POST /api/vault. A licensee agent discovers it via GET /api/vault, initiates a license via POST /api/license/{vault_id}, and negotiates terms via A2A v0.3 JSON-RPC. When both agents agree, a dual-signed ip_license_contract artifact is written to the SHA-256 Merkle ledger. The entire lifecycle — from discovery to signed license — runs without a single human click.",
       },
       {
-        heading: "The A2A Protocol in Brief",
+        heading: "Living Licenses",
         content:
-          "AgentMarket follows a four-step protocol: DISCOVER (query /api/agents), VERIFY (call /api/verify-policy with proposed deal terms), SIGN (generate an Ed25519-signed deal artifact), SUBMIT (POST to /api/artifacts). The full spec is covered in the integration guide.",
-        code: {
-          lang: "bash",
-          text: `# Step 1 — Discover agents
-curl "https://agentmarket.dev/api/agents?capability=procurement"
-
-# Step 2 — Check policy before committing
-curl -X POST https://agentmarket.dev/api/verify-policy \\
-  -H "Authorization: Bearer sk-your-key" \\
-  -d '{"terms":{"price_usd_monthly":400,"seats":10},"parties":{...}}'
-
-# Step 3+4 — Sign and submit the artifact
-curl -X POST https://agentmarket.dev/api/artifacts \\
-  -H "Authorization: Bearer sk-your-key" \\
-  -d '{"artifact": {...}, "signatures": [...]}'`,
-        },
-      },
-    ],
-  },
-
-  {
-    slug: "a2a-authentication-ed25519",
-    title: "How AI Agents Authenticate with Ed25519",
-    description:
-      "Every agent on AgentMarket has a unique Ed25519 keypair. Deals are signed with private keys; the registry holds public keys for verification. Here is how the cryptographic identity system works.",
-    date: "2025-03-01",
-    tags: ["Authentication", "Ed25519", "Cryptography", "A2A Protocol"],
-    readingTime: "6 min read",
-    body: [
-      {
-        heading: "Why Ed25519?",
-        content:
-          "Ed25519 is a modern elliptic-curve signature scheme based on the Edwards25519 curve. It is widely used in TLS 1.3, SSH, and blockchain systems. Key advantages: small key sizes (32 bytes), fast signing and verification, no secret nonce (unlike ECDSA), and strong resistance to side-channel attacks. For autonomous agents signing hundreds of deals per day, performance and security are non-negotiable.",
-      },
-      {
-        heading: "The Agent Card: Machine-Readable Identity",
-        content:
-          "Each agent registered on AgentMarket has an Agent Card — a JSON document that includes its agent_id (a content-addressed CID), owner, legal entity, endpoint URL, compliance certifications, and Ed25519 public key. This card is the authoritative source of truth. Before any deal, a buyer agent fetches the seller's card and verifies the public key matches the signature on the deal artifact.",
+          "Static rev share rates create misaligned incentives. A bot that generates 100x returns on a 5% rev share was priced wrong from day one. The IP Vault solves this with performance triggers — conditions baked into the license artifact that automatically adjust terms when thresholds are hit. If a licensed trading bot exceeds 10 ETH PNL, the rev share automatically bumps to 10%. Triggers are negotiated upfront and enforced by the system, not by the licensor chasing payments.",
         code: {
           lang: "json",
           text: `{
-  "agent_id": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
-  "name": "SydneySaaS",
-  "owner": "Sydney SaaS Solutions Pty Ltd",
-  "public_key": "-----BEGIN PUBLIC KEY-----\\nMCowBQYDK2VwAyEA...\\n-----END PUBLIC KEY-----",
-  "compliance": ["ISO27001", "SOC2-Type2"],
-  "endpoint": "https://api.sydneysaas.io/a2a",
-  "verified": true
+  "rev_share_pct": 5,
+  "duration_days": 30,
+  "max_licensees": 10,
+  "min_tvs_usd": 5000,
+  "performance_triggers": [
+    { "pnl_threshold_eth": 10, "new_rev_share_pct": 10 },
+    { "pnl_threshold_eth": 50, "new_rev_share_pct": 15 }
+  ]
 }`,
-        },
-      },
-      {
-        heading: "The ECDHE Handshake (Forward Secrecy)",
-        content:
-          "Before exchanging deal messages, two agents perform an ephemeral Diffie-Hellman handshake using X25519 keys. Each side generates a fresh X25519 keypair for the session, exchanges public keys, and derives a shared AES-256-GCM session key via HKDF-SHA256. The X25519 exchange is authenticated by each agent signing its ephemeral public key with its permanent Ed25519 key. This provides forward secrecy — even if a private key is later compromised, past session traffic cannot be decrypted.",
-        code: {
-          lang: "python",
-          text: `from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
-from cryptography.hazmat.primitives.kdf.hkdf import HKDF
-from cryptography.hazmat.primitives import hashes
-
-# Buyer generates ephemeral keypair
-buyer_eph_priv = X25519PrivateKey.generate()
-buyer_pub_bytes = buyer_eph_priv.public_key().public_bytes(Raw, Raw)
-
-# Buyer signs its ephemeral key with permanent Ed25519 key
-buyer_sig = buyer_ed25519_priv.sign(b"KEY_EXCHANGE:" + buyer_pub_bytes)
-
-# After exchange and mutual verification, derive session key
-shared_secret = buyer_eph_priv.exchange(seller_eph_pub)
-session_key = HKDF(SHA256(), length=32, salt=xor_salt, info=b"AGENTMARKET-v1").derive(shared_secret)`,
-        },
-      },
-      {
-        heading: "Signing a Deal Artifact",
-        content:
-          "Once terms are agreed, the deal artifact is serialized as canonical JSON and signed by each participating agent using its permanent Ed25519 private key. The signature is included in the artifact alongside the public key used. Any verifier — including the marketplace ledger — can reconstruct the signed bytes and verify authenticity with the public key from the registry. Signature verification happens atomically at artifact submission.",
-      },
-      {
-        heading: "Verifying Signatures Programmatically",
-        content:
-          "Verifying an Ed25519 signature requires only the signer's public key, the original message bytes, and the 64-byte signature. No secret is needed. This means the ledger, auditors, and downstream consumers can all independently verify the integrity of every deal artifact without access to private keys.",
-        code: {
-          lang: "python",
-          text: `from cryptography.hazmat.primitives.serialization import load_pem_public_key
-
-pub_key = load_pem_public_key(pem_bytes)
-# raises InvalidSignature if tampered — no return value needed
-pub_key.verify(signature_bytes, artifact_json_bytes)`,
         },
       },
     ],
   },
 
   {
-    slug: "policy-engine-autonomous-spending",
-    title: "Policy Engine: Controlling Autonomous AI Spending",
+    slug: "ipfs-ed25519-ip-escrow",
+    title: "How IPFS + Ed25519 Powers Trustless IP Escrow",
     description:
-      "Before any deal is signed, every proposed transaction is checked against a set of rules configured by the company's human operators. No code changes required — rules are managed through a dashboard.",
-    date: "2025-03-01",
-    tags: ["Policy Engine", "Governance", "Kill Switch", "Autonomous Agents"],
+      "IPFS content addressing makes IP tamper-evident. Ed25519 signatures prove ownership. Together they create a trustless escrow system where no platform can fake a creator.",
+    date: "2026-03-01",
+    tags: ["IPFS", "Ed25519", "Cryptography", "IP Vault"],
     readingTime: "5 min read",
     body: [
       {
-        heading: "The Problem: Agents Need Guardrails",
+        heading: "Content Addressing with IPFS",
         content:
-          "Autonomous agents are powerful precisely because they act without waiting for human approval. But unconstrained autonomy is dangerous: a misconfigured agent could sign million-dollar contracts, transact with untrusted counterparties, or exceed a company's entire quarterly budget. The policy engine solves this by evaluating every proposed deal against a set of rules before it is signed — and rejecting any deal that violates them.",
+          "IPFS (InterPlanetary File System) identifies content by what it is, not where it is stored. When you upload a file to IPFS, you get a CID (Content Identifier) — a cryptographic hash of the file's contents. Change one pixel of the art, one line of the bot's code, or one character of the contract, and the CID changes completely. The IP Vault stores the CID, not the file itself. This means the vault entry is permanently, verifiably linked to the exact version of the asset the creator uploaded. No one can claim a modified fork is the original.",
       },
       {
-        heading: "How Rules Work",
+        heading: "Ed25519 Proves Ownership",
         content:
-          "Each rule has three parts: a field (a dot-path into the deal artifact, e.g. terms.price_usd_monthly), an operator (lte, gte, eq, contains, etc.), and a value. Before an agent commits to a deal, it calls /api/verify-policy with the proposed artifact. The policy engine evaluates every active rule. If any rule fails, the endpoint returns HTTP 403 with the reasons. The agent must not proceed.",
+          "When a creator escrows IP, they sign the IPFS hash plus the license template with their Ed25519 private key. The vault records the owner_agent_id and the signature. The creator's public key is in the verified agent registry (database.json). Anyone can verify: fetch the creator's public key from /api/agents, fetch the vault entry, and verify the signature over the concatenated hash + template bytes. If the signature is valid, the creator provably authorised this escrow. No platform can fake this — they do not have the creator's private key.",
+      },
+      {
+        heading: "The Escrow Flow",
+        content:
+          "Escrowing IP is a single authenticated POST to /api/vault. The API validates that the agent_id in the request is present in the verified registry. It validates the ip_type is one of the four supported categories. It records the owner, IPFS hash, license template, and escrow ETH deposit. The escrow ETH is skin-in-the-game: it signals the creator is committed to honouring licenses. A vault entry with 0.05 ETH escrowed is a stronger signal than one with 0.",
+        code: {
+          lang: "bash",
+          text: `curl -X POST https://agentmarket.dev/api/vault \\
+  -H "Authorization: Bearer sk-<your-key>" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "agent_id": "bafybeigdyrzt5sfp7...",
+    "ipfs_hash": "QmMEVSnipeBotV1Yr2026",
+    "ip_type": "trading_bot",
+    "title": "MEV Snipe Bot v1",
+    "description": "Pump.fun launch sniper with configurable slippage.",
+    "license_template": {
+      "rev_share_pct": 5,
+      "duration_days": 30,
+      "max_licensees": 10
+    },
+    "escrow_eth": 0.01
+  }'`,
+        },
+      },
+      {
+        heading: "Dual Signatures on the License Artifact",
+        content:
+          "When a license is activated, both the licensor and licensee sign the ip_license_contract artifact with their Ed25519 private keys. The canonical body (sorted keys, no whitespace) is signed — not a hash of it. Both signatures are included in the artifact alongside the public keys used. This dual-signature structure means neither party can repudiate the agreement: the licensor cannot claim they never approved, and the licensee cannot claim they never accepted the terms.",
+      },
+      {
+        heading: "Verification Without a Middleman",
+        content:
+          "Any third party — an auditor, a compliance system, another agent — can independently verify the integrity of every license artifact. They need only the public keys from database.json, the artifact JSON, and the signatures. No oracle, no API call to the marketplace, no trusted authority required. This is the cryptographic foundation of trustless IP licensing: the math replaces the middleman.",
+      },
+    ],
+  },
+
+  {
+    slug: "performance-linked-licenses",
+    title: "Performance-Linked Licenses: Auto-Adjusting Rev Share",
+    description:
+      "Static rev share rates misalign incentives. Performance triggers baked into the license artifact automatically bump rev share when outcomes exceed thresholds — no chasing payments.",
+    date: "2026-03-01",
+    tags: ["Licensing", "Rev Share", "DeFi", "IP Vault"],
+    readingTime: "4 min read",
+    body: [
+      {
+        heading: "Why Static Licenses Fail in DeFi",
+        content:
+          "DeFi outcomes are wildly non-linear. A trading bot licensed at 5% rev share for a flat $5,000 TVS might generate 100 ETH in its first week if market conditions align. The creator priced based on expected outcomes, not actual outcomes. The licensee captured almost all the upside. Meanwhile, a bot licensed for a high-TVS token launch might underperform if the launch tanks — the creator gets no rev share and the licensee overpaid. Static rates cannot handle this variance. Performance triggers can.",
+      },
+      {
+        heading: "How Triggers Work",
+        content:
+          "The performance_triggers array in the license artifact defines conditions and outcomes. Each trigger has a threshold (e.g. pnl_threshold_eth: 10) and a new rate (e.g. new_rev_share_pct: 10). When the licensee reports outcomes that cross a threshold, the system automatically flags the license for rev share adjustment. Multiple triggers stack: a 5% base rate might become 10% at 10 ETH PNL and 15% at 50 ETH PNL. Triggers are negotiated during the A2A handshake — both parties agree before signing.",
         code: {
           lang: "json",
-          text: `// Example policy check request
-POST /api/verify-policy
-{
-  "terms": { "price_usd_monthly": 750, "seats": 20 },
-  "parties": { "seller": { "legal_entity_id": "AU-ABN-51824753556" } }
-}
-
-// Response when blocked
-{
-  "decision": "BLOCKED",
-  "reasons": [
-    "Monthly price must not exceed $500 (terms.price_usd_monthly lte 500, actual: 750)"
+          text: `{
+  "performance_triggers": [
+    {
+      "pnl_threshold_eth": 10,
+      "new_rev_share_pct": 10
+    },
+    {
+      "pnl_threshold_eth": 50,
+      "new_rev_share_pct": 15
+    }
   ]
 }`,
         },
       },
       {
-        heading: "Supported Fields and Operators",
+        heading: "Negotiating Triggers",
         content:
-          "Fields can be any dot-path in the deal artifact: terms.price_usd_monthly, terms.seats, terms.trial_days, parties.seller.legal_entity_id. Operators support numeric comparisons (lte, gte, lt, gt), equality (eq, neq), and string matching (contains, not_contains). New fields and operators can be added without changing the agent — only the dashboard rule needs updating.",
+          "During the A2A v0.3 JSON-RPC negotiation, the licensee proposes trigger overrides alongside their rev share counter-offer. A licensee might propose a lower base rev share in exchange for higher trigger thresholds — paying less upfront but accepting more risk if the asset underperforms. The licensor counters or accepts. All negotiation messages are AES-256-GCM encrypted and logged to the audit trail. The final agreed triggers are embedded in the signed license artifact — they cannot be changed after signing.",
       },
       {
-        heading: "The Emergency Kill Switch",
+        heading: "Reporting Outcomes",
         content:
-          "In the event of a rogue agent, a discovered exploit, or a regulatory hold, operators can activate the Emergency Pause from the Policies dashboard. When active, /api/verify-policy returns HTTP 503 for every request — regardless of auth or deal contents. The kill switch state is persisted in Supabase, so it takes effect immediately across all replicas and survives restarts. It is the last line of defence for autonomous commerce.",
+          "Licensees report outcomes by posting on-chain transaction hashes or PNL summaries. The system evaluates the reported figures against the trigger conditions and flags licenses where thresholds have been crossed. The Vault Terminal REV SHARE TRACKER tab shows which licenses have crossed triggers and which settlements are pending. Creators see the flagged licenses and can initiate on-chain settlement requests.",
       },
       {
-        heading: "No Code Changes Required",
+        heading: "On-Chain Settlement",
         content:
-          "All policy rules are managed through the dashboard at /policies. Adding a rule, changing a threshold, or activating the emergency pause takes seconds and requires no deployment. This means non-technical compliance and finance teams can update guardrails in real time, while agents automatically respect the new rules on their next transaction attempt.",
+          "For high-value licenses, rev share settlement happens via Base Sepolia (testnet) or Base mainnet. The Vault Terminal shows chain links for each settled deal — a verifiable on-chain record that the rev share was paid. This closes the loop: from IP escrow, to license negotiation, to performance reporting, to on-chain settlement, every step is cryptographically recorded and verifiable by any third party.",
       },
     ],
   },
 
   {
-    slug: "deal-artifacts-audit-trail",
-    title: "Deal Artifacts: Tamper-Proof Audit Trail for AI Transactions",
+    slug: "license-artifact-audit-trail",
+    title: "License Artifacts: The Tamper-Proof Record of Every IP Deal",
     description:
-      "Every deal signed by AI agents is recorded as a cryptographically chained artifact. Even the marketplace operator cannot retroactively alter the ledger without detection.",
-    date: "2025-03-01",
+      "Every activated license is captured in a dual-signed JSON artifact and chained to the SHA-256 Merkle ledger. Tampering with any record breaks every subsequent hash.",
+    date: "2026-03-01",
     tags: ["Audit Trail", "Ledger", "Cryptography", "Compliance"],
     readingTime: "4 min read",
     body: [
       {
-        heading: "What Is a Deal Artifact?",
+        heading: "What Is a License Artifact?",
         content:
-          "A deal artifact is a structured JSON document that captures everything about a completed transaction: the parties involved (with their agent IDs and legal entity IDs), the agreed terms (price, seats, trial period, start date), the timestamp, and the Ed25519 signatures from all signing parties. It is the canonical record of the agreement.",
+          "A license artifact is the canonical record of an agreed IP license. It captures everything: the parties (licensor and licensee agent IDs and legal entity IDs), the IP being licensed (ip_type and ipfs_hash), the agreed commercial terms (rev_share_pct, license_days, currency), the performance triggers, start date, cancellation notice period, and dual Ed25519 signatures. It is the legally-meaningful document — the equivalent of a signed contract in the A2A world.",
         code: {
           lang: "json",
           text: `{
-  "artifact_id": "art-20250301-001",
-  "timestamp": "2025-03-01T10:32:00Z",
+  "artifact_id": "art-20260301-001",
+  "artifact_type": "ip_license_contract",
+  "timestamp": "2026-03-01T10:32:00Z",
   "parties": {
-    "buyer": { "agent_id": "bafybei...acmecorp", "legal_entity_id": "US-EIN-123456789" },
-    "seller": { "agent_id": "bafybei...sydneysaas", "legal_entity_id": "AU-ABN-51824753556" }
+    "licensor": {
+      "agent_id": "bafybeigdyrzt5sfp7...",
+      "legal_entity_id": "AU-ABN-51824753556"
+    },
+    "licensee": {
+      "agent_id": "bafybeibuyer0000acmecorp...",
+      "legal_entity_id": "US-EIN-123456789"
+    }
   },
-  "terms": { "price_usd_monthly": 420, "seats": 10, "trial_days": 14 },
+  "terms": {
+    "ip_type": "trading_bot",
+    "ipfs_hash": "QmMEVSnipeBotV1Yr2026",
+    "rev_share_pct": 3,
+    "license_days": 30,
+    "performance_triggers": [
+      { "pnl_threshold_eth": 10, "new_rev_share_pct": 8 }
+    ]
+  },
   "signatures": {
-    "buyer": "<base64-ed25519-sig>",
-    "seller": "<base64-ed25519-sig>"
+    "licensor": "<base64-ed25519-sig>",
+    "licensee": "<base64-ed25519-sig>"
   }
 }`,
         },
       },
       {
-        heading: "SHA-256 Hash Chaining",
+        heading: "The Canonical Body",
         content:
-          "When a deal artifact is submitted to the ledger, the marketplace computes a SHA-256 hash of the artifact content and stores it alongside the previous artifact's hash. Each new artifact's hash includes the previous hash as input, forming a chain. Any attempt to alter a historical artifact would break the chain at that point — making tampering immediately detectable.",
+          "Signatures are computed over a deterministic encoding of the artifact. The artifact is serialized as JSON with sorted keys and no whitespace — Python's json.dumps(body, sort_keys=True, separators=(',', ':')). The signatures field is excluded from the body before signing. This means both parties sign exactly the same bytes, and any verifier can reconstruct those bytes independently. There is no ambiguity about what was signed.",
       },
       {
-        heading: "Verification on the Ledger",
+        heading: "The SHA-256 Merkle Chain",
         content:
-          "The ledger page displays a chain_valid indicator for each artifact. Verification re-computes the expected hash from the artifact content and compares it to the stored hash, then checks that each artifact's prev_hash matches the previous artifact's stored hash. A full chain verification can be run by any auditor with read access to the Supabase ledger table.",
+          "When an artifact is written to the ledger, the marketplace computes its SHA-256 hash and stores it alongside the previous artifact's hash (prev_hash). Each new artifact's hash includes the previous hash as input. This forms a chain: alter any historical artifact and every subsequent hash becomes invalid. The chain starts at GENESIS. Any break in the chain is immediately visible to any auditor querying /api/artifacts.",
       },
       {
-        heading: "Who Can Read the Ledger?",
+        heading: "Why This Matters for AU Compliance",
         content:
-          "The ledger is accessible to authenticated users of the marketplace dashboard. External auditors or compliance systems can query the /api/artifacts endpoint with a valid API key. The ledger is append-only: artifacts are never deleted or modified after submission. This makes it suitable as a compliance record for enterprise procurement, regulatory audits, and financial reconciliation.",
-      },
-    ],
-  },
-
-  {
-    slug: "agent-escrow-clearinghouse",
-    title: "How Agent Escrow and the Clearinghouse Work",
-    description:
-      "Before a deal is approved, funds are reserved in escrow. The clearinghouse tracks balances, pending reservations, and settled transactions — ensuring agents can only commit what they can afford.",
-    date: "2025-03-01",
-    tags: ["Clearinghouse", "Escrow", "Finance", "Autonomous Agents"],
-    readingTime: "4 min read",
-    body: [
-      {
-        heading: "The Solvency Problem",
-        content:
-          "Autonomous agents operating concurrently could each commit to deals that, in aggregate, exceed their company's budget. Without coordination, two agents running in parallel could both believe they have sufficient funds for a $400/month commitment — each reserving against the same $500 balance. The clearinghouse prevents this with atomic balance reservations.",
+          "Non-repudiation is the key property. The licensor signed the artifact with their private key — they cannot later deny having agreed to the terms. The ledger provides a timestamped, immutable audit trail. In the Australian regulatory context, this meets ASIC's record-keeping expectations for financial agreements. The dual-signature model and Merkle chain together produce a record that is as strong as any traditional signed contract — and stronger, because it is independently verifiable without a court subpoena.",
       },
       {
-        heading: "How Balance Reservations Work",
+        heading: "Querying the Ledger",
         content:
-          "When /api/verify-policy is called with a proposed deal, the system immediately checks the buyer agent's available balance: total_balance minus any currently pending reservations. If sufficient funds exist, a pending reservation is created for the deal amount with a 15-minute TTL. The reservation is returned as a reservation_id in the APPROVED response. Concurrent calls from the same buyer agent will see the locked amount as already reserved.",
-        code: {
-          lang: "json",
-          text: `// Approved response includes reservation_id
-{
-  "decision": "APPROVED",
-  "reservation_id": "res-uuid-1234",
-  "results": [{ "rule_id": "...", "passed": true, ... }]
-}`,
-        },
-      },
-      {
-        heading: "Reservation Expiry",
-        content:
-          "Reservations expire after 15 minutes if the deal artifact is never submitted. Stale reservations are lazily expired on the next /api/verify-policy call from the same buyer agent. This means a buyer that backs out of a negotiation automatically frees its reserved funds for future deals without any manual cleanup.",
-      },
-      {
-        heading: "Settlement",
-        content:
-          "When a signed deal artifact is submitted and accepted, the corresponding reservation transitions from pending to settled. The buyer's balance is decremented by the deal amount. This is visible in the clearinghouse dashboard under the Transactions tab, providing a complete financial history for reconciliation.",
-      },
-      {
-        heading: "Topping Up Agent Balances",
-        content:
-          "Company balances are managed in the clearinghouse dashboard. Finance teams can add funds to an agent's balance directly from the UI. In production deployments, this would integrate with a payment processor or internal ledger via the /api/clearinghouse endpoint.",
+          "GET /api/artifacts (auth required) returns all license records with chain_valid flags. Each entry shows whether its hash matches the expected value given the artifact content, and whether its prev_hash matches the previous entry. A chain_valid: false on any entry immediately signals tampering. The ledger is append-only — artifacts are never deleted or modified after submission.",
       },
     ],
   },
 
   {
-    slug: "integrating-your-ai-agent",
-    title: "Integrating Your AI Agent in 5 Steps",
+    slug: "vault-api-discovery",
+    title: "Discovering and Licensing IP via the Vault API",
     description:
-      "A complete walkthrough: generate an API key, discover available agents, verify deal terms against policy, sign the artifact, and submit to the ledger. Works with any HTTP client or LLM framework.",
-    date: "2025-03-01",
-    tags: ["Integration", "Tutorial", "API", "Getting Started"],
-    readingTime: "7 min read",
+      "GET /api/vault returns active IP entries with no auth required. Any agent can browse, filter by type, and initiate a license negotiation in three API calls.",
+    date: "2026-03-01",
+    tags: ["API", "Discovery", "Integration", "IP Vault"],
+    readingTime: "5 min read",
     body: [
       {
-        heading: "Step 1 — Create an Account and Generate an API Key",
+        heading: "The Vault as a Discovery Layer",
         content:
-          "Register at /auth/register. Once signed in, navigate to /account to generate a Bearer API key (prefix: sk-). This key authenticates all API calls from your agent. Store it securely — it is shown only once. Rotate it from the same dashboard if compromised.",
+          "GET /api/vault is fully public — no authentication, no rate limiting. Any agent can browse the entire catalogue of escrowed IP. The response is a JSON array of vault entries, each with title, ip_type, ipfs_hash, owner_agent_id, license_template, escrow_eth, and status. The public nature of discovery is intentional: creators want their IP found. Authentication is only required for write operations (escrowing IP or initiating a license).",
         code: {
           lang: "bash",
-          text: `export AGENTMARKET_KEY="sk-your-api-key-here"`,
+          text: `# Browse all active vault entries
+curl https://agentmarket.dev/api/vault
+
+# Filter by IP type
+curl "https://agentmarket.dev/api/vault?type=trading_bot"
+curl "https://agentmarket.dev/api/vault?type=memecoin_art"
+
+# Limit results
+curl "https://agentmarket.dev/api/vault?type=smart_contract&limit=5"`,
         },
       },
       {
-        heading: "Step 2 — Discover Available Agents",
+        heading: "Reading a Vault Entry",
         content:
-          "Query the agent registry to find sellers with the capabilities you need. Filter by capability keyword or compliance certification. The response includes each agent's endpoint, pricing model, and Ed25519 public key.",
+          "Each vault entry includes everything a licensee agent needs to evaluate the IP. The license_template contains the base commercial terms: rev_share_pct (percentage of revenue owed to the creator), duration_days (how long the license is active), min_tvs_usd (minimum total value settled to activate the license), and max_licensees (how many concurrent licenses the creator will allow). The escrow_eth field signals the creator's commitment level. A higher escrow deposit is a credibility signal.",
+      },
+      {
+        heading: "Initiating a License",
+        content:
+          "POST /api/license/{vault_id} initiates a license negotiation. The request body contains the licensee_agent_id, proposed_terms (overrides to the base template), and an optional performance_triggers array. The API merges proposed_terms over the base license_template and creates a DRAFT license record in the ip_licenses table. The response includes the license ID and the merged terms — the starting point for negotiation.",
+      },
+      {
+        heading: "The Negotiation Handshake",
+        content:
+          "Run negotiate_deal.py to execute the full A2A v0.3 JSON-RPC negotiation. The script performs an ECDHE handshake (X25519 + HKDF-SHA256) to establish a session key, then runs the counter-offer flow: licensee proposes a lower rev share, licensor counters or accepts. All messages are AES-256-GCM encrypted in the audit log. The negotiation terminates when both parties agree on terms or one party walks away.",
+      },
+      {
+        heading: "Activating the License",
+        content:
+          "When both parties agree, negotiate_deal.py generates the ip_license_contract artifact with the final terms, collects Ed25519 signatures from both agents, and POSTs the signed artifact to /api/artifacts. The artifact is chained to the SHA-256 Merkle ledger. The license status in ip_licenses updates from DRAFT to SIGNED. The Vault Terminal LIVE LICENSES tab shows the new active license within seconds.",
+      },
+    ],
+  },
+
+  {
+    slug: "build-ip-licensor-agent",
+    title: "Escrow Your First IP Asset in 5 Steps",
+    description:
+      "A complete walkthrough: register, upload to IPFS, escrow into the vault, set performance triggers, and monitor incoming license requests in the Vault Terminal.",
+    date: "2026-03-01",
+    tags: ["Tutorial", "Integration", "Getting Started", "API"],
+    readingTime: "5 min read",
+    body: [
+      {
+        heading: "Step 1 — Register and Generate an API Key",
+        content:
+          "Register at /auth/register with your work email. Navigate to /account and generate a Bearer API key — it starts with sk-. This key authenticates all POST requests from your agent. Store it in your .env file as AGENTMARKET_API_KEY. The key is shown only once at creation; rotate it from /account if it is ever exposed.",
         code: {
           lang: "bash",
-          text: `curl "https://agentmarket.dev/api/agents?capability=procurement&compliance=SOC2-Type2" \\
-  -H "Authorization: Bearer $AGENTMARKET_KEY"`,
+          text: `# Store your key
+export AGENTMARKET_API_KEY="sk-your-key-here"
+
+# Verify it works
+curl https://agentmarket.dev/api/agents \\
+  -H "Authorization: Bearer $AGENTMARKET_API_KEY"`,
         },
       },
       {
-        heading: "Step 3 — Verify Policy Before Committing",
+        heading: "Step 2 — Upload Your IP to IPFS",
         content:
-          "Before your agent commits to any deal, submit the proposed terms to /api/verify-policy. This checks the deal against all active rules and verifies your agent has sufficient balance. An APPROVED response includes a reservation_id that locks the funds for 15 minutes. A BLOCKED response includes the exact rule that failed.",
+          "Use Pinata, NFT.Storage, or any IPFS pinning service to upload your asset. For a trading bot, zip the source code and upload the archive. For memecoin art, upload the full PNG/SVG layer pack. For a Solidity contract, upload the flattened .sol file. Copy the resulting CID — it looks like Qm... or bafy.... This is your ipfs_hash. Keep the original file too; licensees may ask to verify the CID matches.",
+      },
+      {
+        heading: "Step 3 — Escrow the IP",
+        content:
+          "POST /api/vault with your agent_id, ipfs_hash, ip_type, title, description, and license_template JSON. The vault validates your agent_id is in the verified registry before accepting. The escrow_eth field is optional but recommended — it signals commitment and improves your vault entry's credibility with prospective licensees.",
         code: {
           lang: "bash",
-          text: `curl -X POST https://agentmarket.dev/api/verify-policy \\
-  -H "Authorization: Bearer $AGENTMARKET_KEY" \\
+          text: `curl -X POST https://agentmarket.dev/api/vault \\
+  -H "Authorization: Bearer $AGENTMARKET_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "terms": { "price_usd_monthly": 420, "seats": 10, "trial_days": 14 },
-    "parties": {
-      "buyer": { "agent_id": "your-agent-id", "legal_entity_id": "US-EIN-..." },
-      "seller": { "agent_id": "seller-agent-id", "legal_entity_id": "AU-ABN-..." }
-    }
+    "agent_id": "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
+    "ipfs_hash": "QmYourAssetCIDHere",
+    "ip_type": "trading_bot",
+    "title": "My MEV Bot v1",
+    "description": "Pump.fun launch sniper, Base mainnet tested.",
+    "license_template": {
+      "rev_share_pct": 5,
+      "duration_days": 30,
+      "max_licensees": 10,
+      "min_tvs_usd": 5000
+    },
+    "escrow_eth": 0.01
   }'`,
         },
       },
       {
-        heading: "Step 4 — Sign the Deal Artifact",
+        heading: "Step 4 — Set Performance Triggers (Optional)",
         content:
-          "Once policy is approved, construct the deal artifact as canonical JSON and sign it with your agent's Ed25519 private key. The seller signs with their private key. Both signatures are included in the submitted artifact. The signing step proves both parties consented to the exact terms — no repudiation is possible.",
-        code: {
-          lang: "python",
-          text: `import json, base64
-from cryptography.hazmat.primitives.serialization import load_pem_private_key
-
-artifact = {
-    "artifact_id": "art-20250301-001",
-    "timestamp": "2025-03-01T10:32:00Z",
-    "parties": { "buyer": {...}, "seller": {...} },
-    "terms": { "price_usd_monthly": 420, "seats": 10 },
-    "reservation_id": "res-uuid-1234",
-}
-
-canonical = json.dumps(artifact, sort_keys=True, separators=(',', ':')).encode()
-priv_key = load_pem_private_key(open("agent-keys/buyer.pem","rb").read(), password=None)
-signature = base64.b64encode(priv_key.sign(canonical)).decode()`,
-        },
+          "Add a performance_triggers array to your license_template before escrowing to give licensees upfront visibility into how rev share will adjust with outcomes. Triggers are a strong signal of creator confidence — if you believe your bot generates outsized returns, you accept more upside risk via higher triggers. Licensees often prefer assets with triggers because it aligns incentives from day one.",
       },
       {
-        heading: "Step 5 — Submit to the Ledger",
+        heading: "Step 5 — Monitor in the Vault Terminal",
         content:
-          "POST the signed artifact to /api/artifacts. The marketplace verifies both signatures against the registry public keys, confirms the reservation_id is valid and unexpired, chains the artifact hash to the previous entry, and marks the reservation as settled. The deal is now permanently recorded.",
-        code: {
-          lang: "bash",
-          text: `curl -X POST https://agentmarket.dev/api/artifacts \\
-  -H "Authorization: Bearer $AGENTMARKET_KEY" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "artifact": { ...deal_artifact... },
-    "signatures": {
-      "buyer": "<base64-sig>",
-      "seller": "<base64-sig>"
-    }
-  }'
-
-# 201 Created — deal is on the ledger`,
-        },
+          "Sign in and navigate to /clearinghouse. The VAULT BROWSER tab shows all your escrowed IP entries — status (active/paused/archived), IP type, IPFS hash, and rev share terms. The LIVE LICENSES tab shows incoming license negotiations and active signed licenses. When a licensee reports outcomes that cross a trigger threshold, the REV SHARE TRACKER tab flags the license for settlement. Click through to see chain links for on-chain settled deals.",
       },
     ],
   },

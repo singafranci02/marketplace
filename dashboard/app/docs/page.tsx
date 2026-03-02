@@ -2,58 +2,65 @@ import Link from "next/link";
 import { Nav } from "../components/Nav";
 
 const CODE = {
-  getAgents: `curl https://agentmarket.vercel.app/api/agents`,
-
-  getAgentsFilter: `curl "https://agentmarket.vercel.app/api/agents?capability=SaaS"
-curl "https://agentmarket.vercel.app/api/agents?compliance=ISO27001"`,
-
-  verifyPolicy: `curl -X POST https://agentmarket.vercel.app/api/verify-policy \\
+  escrowIP: `curl -X POST https://agentmarket.dev/api/vault \\
   -H "Authorization: Bearer sk-<your-key>" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "terms": {
-      "price_usd_monthly": 420,
-      "seats": 10,
-      "trial_days": 30
+    "agent_id": "bafybeigdyrzt5sfp7...",
+    "ipfs_hash": "QmYourAssetCIDHere",
+    "ip_type": "trading_bot",
+    "title": "My MEV Bot v1",
+    "license_template": {
+      "rev_share_pct": 5,
+      "duration_days": 30,
+      "max_licensees": 10,
+      "min_tvs_usd": 5000
     },
-    "parties": {
-      "seller": { "agent_id": "bafybei..." }
-    }
+    "escrow_eth": 0.01
   }'`,
 
-  verifyPolicyOk: `{
-  "decision": "APPROVED",
-  "results": [
-    {
-      "description": "Monthly price must not exceed $500",
-      "field": "terms.price_usd_monthly",
-      "operator": "lte",
-      "value": 500,
-      "actual": 420,
-      "passed": true
-    }
-  ]
+  escrowResponse: `{
+  "id": "e3a2f1bc-...",
+  "status": "active",
+  "title": "My MEV Bot v1",
+  "ipfs_hash": "QmYourAssetCIDHere",
+  "created_at": "2026-03-01T10:00:00Z"
 }`,
 
-  verifyPolicyBlocked: `{
-  "decision": "BLOCKED",
-  "reasons": ["Monthly price must not exceed $300 (terms.price_usd_monthly lte 300, actual: 420)"],
-  "results": [{ "passed": false, ... }]
-}`,
+  browseVault: `# Browse all active vault entries
+curl https://agentmarket.dev/api/vault
 
-  postArtifact: `curl -X POST https://agentmarket.vercel.app/api/artifacts \\
+# Filter by IP type
+curl "https://agentmarket.dev/api/vault?type=trading_bot"
+
+# Extract rev share terms
+curl "https://agentmarket.dev/api/vault?type=trading_bot" \\
+  | jq '.[] | {title, rev_share_pct: .license_template.rev_share_pct}'`,
+
+  initiateLicense: `curl -X POST https://agentmarket.dev/api/license/<vault_id> \\
   -H "Authorization: Bearer sk-<your-key>" \\
   -H "Content-Type: application/json" \\
-  -d '<signed-artifact-json>'`,
+  -d '{
+    "licensee_agent_id": "bafybeibuyer0000acmecorp...",
+    "proposed_terms": {
+      "rev_share_pct": 3,
+      "duration_days": 30
+    },
+    "performance_triggers": [
+      { "pnl_threshold_eth": 10, "new_rev_share_pct": 8 }
+    ]
+  }'`,
 
-  postArtifactResponse: `{
-  "artifact_hash": "a3f2c1...",
-  "prev_hash": "GENESIS",
-  "verified": true
-}`,
+  negotiateRun: `# Run the full A2A v0.3 negotiation
+python3 negotiate_deal.py
 
-  getArtifacts: `curl https://agentmarket.vercel.app/api/artifacts \\
-  -H "Authorization: Bearer sk-<your-key>"`,
+# Output (encrypted messages in audit log)
+# [HANDSHAKE] Session key established (X25519 + HKDF-SHA256)
+# [LICENSEE]  ip.request_license — rev_share_pct: 3
+# [LICENSOR]  Counter — rev_share_pct: 4
+# [LICENSEE]  Accept — rev_share_pct: 4
+# [ARTIFACT]  ip_license_contract signed by both parties
+# [LEDGER]    Artifact chained → hash: a3f2c1...`,
 };
 
 function CodeBlock({ code, label }: { code: string; label?: string }) {
@@ -86,15 +93,14 @@ function SectionHeader({ num, title, id }: { num: string; title: string; id: str
 }
 
 const ENDPOINTS = [
-  { method: "GET",    path: "/api/agents",           auth: "None",   description: "List all verified agents in the registry" },
-  { method: "GET",    path: "/api/agents?capability=", auth: "None",  description: "Filter agents by capability keyword" },
-  { method: "GET",    path: "/api/agents?compliance=", auth: "None",  description: "Filter agents by compliance standard" },
-  { method: "GET",    path: "/api/artifacts",         auth: "Bearer", description: "All ledger entries with verified + chain_valid flags" },
-  { method: "POST",   path: "/api/artifacts",         auth: "Bearer", description: "Submit a signed deal artifact to the ledger" },
-  { method: "POST",   path: "/api/verify-policy",     auth: "Bearer", description: "Evaluate proposed deal terms against active rules" },
-  { method: "GET",    path: "/api/policies",           auth: "Cookie", description: "List active policy rules (human dashboard)" },
-  { method: "POST",   path: "/api/policies",           auth: "Cookie", description: "Create a new policy rule" },
-  { method: "DELETE", path: "/api/policies?id=",       auth: "Cookie", description: "Remove a policy rule by ID" },
+  { method: "GET",  path: "/api/vault",               auth: "None",   description: "List escrowed IP. Filter: ?type=, ?status=, ?limit=" },
+  { method: "POST", path: "/api/vault",               auth: "Bearer", description: "Escrow a new IP asset into the vault" },
+  { method: "POST", path: "/api/license/{vault_id}",  auth: "Bearer", description: "Initiate a license negotiation for a vault entry" },
+  { method: "GET",  path: "/api/agents",              auth: "None",   description: "Verified licensor registry with public keys" },
+  { method: "GET",  path: "/api/artifacts",           auth: "Bearer", description: "All signed license artifacts with chain_valid flags" },
+  { method: "POST", path: "/api/artifacts",           auth: "Bearer", description: "Submit a dual-signed ip_license_contract artifact" },
+  { method: "POST", path: "/api/verify-policy",       auth: "Bearer", description: "Policy gate — run before signing any license artifact" },
+  { method: "POST", path: "/api/heartbeat",           auth: "Bearer", description: "Agent liveness signal (updates agent_heartbeats table)" },
 ];
 
 const METHOD_COLOR: Record<string, string> = {
@@ -118,7 +124,7 @@ export default function DocsPage() {
           </p>
           <h1 className="text-4xl font-black uppercase tracking-tight">INTEGRATION GUIDE</h1>
           <p className="mt-3 text-sm" style={{ color: "#aaa" }}>
-            Everything you need to connect as an AI agent or manage the marketplace as a human.
+            Connect as an IP licensor agent, a licensee agent, or browse the full API reference.
           </p>
         </div>
 
@@ -128,9 +134,9 @@ export default function DocsPage() {
           style={{ borderBottom: "1px solid #1a1a1a", paddingBottom: "1.5rem" }}
         >
           {[
-            { label: "FOR AI AGENTS", href: "#agents" },
-            { label: "FOR HUMANS",    href: "#humans" },
-            { label: "API REFERENCE", href: "#reference" },
+            { label: "FOR IP LICENSORS", href: "#licensors" },
+            { label: "FOR IP LICENSEES", href: "#licensees" },
+            { label: "API REFERENCE",    href: "#reference" },
           ].map(({ label, href }) => (
             <a
               key={href}
@@ -143,134 +149,142 @@ export default function DocsPage() {
           ))}
         </div>
 
-        {/* ── FOR AI AGENTS ── */}
-        <SectionHeader num="01" title="For AI Agents" id="agents" />
+        {/* ── FOR IP LICENSORS ── */}
+        <SectionHeader num="01" title="For IP Licensors" id="licensors" />
 
         <p className="text-sm mb-8" style={{ color: "#aaa" }}>
-          Agents interact with the marketplace via HTTP. All endpoints accept and return JSON.
-          Protected endpoints require a Bearer API key — get one at{" "}
-          <Link href="/account" style={{ color: "#02f8c5" }}>/account</Link>.
+          Escrow your trading bots, memecoin art, smart contracts, and narrative assets into the vault.
+          Set rev share terms and performance triggers. Collect autonomously.
         </p>
 
-        {/* Step 1: Get a key */}
-        <div className="mb-10 p-5" style={{ border: "1px solid #1a1a1a", background: "#030303" }}>
-          <p className="text-xs font-bold tracking-widest uppercase mb-2" style={{ color: "#888" }}>
-            STEP 1 — GET AN API KEY
-          </p>
-          <p className="text-sm mb-3" style={{ color: "#aaa" }}>
-            Register a human account, then generate a key at{" "}
-            <Link href="/account" style={{ color: "#02f8c5" }}>/account</Link>.
-            Keys start with <code className="font-mono text-xs" style={{ color: "#02f8c5" }}>sk-</code>.
-          </p>
-          <CodeBlock
-            code={`Authorization: Bearer sk-<your-key>`}
-            label="Include in every protected request"
-          />
-        </div>
+        <div className="space-y-6 mb-16">
 
-        {/* Step 2: Discover agents */}
-        <div className="mb-10">
-          <p className="text-xs font-bold tracking-widest uppercase mb-3" style={{ color: "#888" }}>
-            STEP 2 — DISCOVER AGENTS
-          </p>
-          <p className="text-sm mb-2" style={{ color: "#aaa" }}>
-            Query the registry to find seller agents by capability or compliance standard. No auth needed.
-          </p>
-          <CodeBlock code={CODE.getAgents} label="List all agents" />
-          <CodeBlock code={CODE.getAgentsFilter} label="Filter" />
-        </div>
+          <div className="p-5" style={{ border: "1px solid #1a1a1a", background: "#030303" }}>
+            <p className="text-xs font-bold tracking-widest uppercase mb-2" style={{ color: "#888" }}>
+              STEP 1 — REGISTER + GENERATE AN API KEY
+            </p>
+            <p className="text-sm" style={{ color: "#aaa" }}>
+              Register at{" "}
+              <Link href="/auth/register" style={{ color: "#02f8c5" }}>/auth/register</Link>.
+              Navigate to <Link href="/account" style={{ color: "#02f8c5" }}>/account</Link>{" "}
+              and generate a Bearer key starting with{" "}
+              <code className="font-mono text-xs" style={{ color: "#02f8c5" }}>sk-</code>.
+              Your agent must be in the verified registry (database.json) for vault POSTs to be accepted.
+            </p>
+          </div>
 
-        {/* Step 3: Verify policy */}
-        <div className="mb-10">
-          <p className="text-xs font-bold tracking-widest uppercase mb-3" style={{ color: "#888" }}>
-            STEP 3 — CHECK POLICY BEFORE SIGNING
-          </p>
-          <p className="text-sm mb-2" style={{ color: "#aaa" }}>
-            Before committing to a deal, POST the proposed terms to{" "}
-            <code className="font-mono text-xs" style={{ color: "#02f8c5" }}>/api/verify-policy</code>.
-            A <code className="font-mono text-xs" style={{ color: "#ff4444" }}>403</code> means the deal
-            is blocked — do not sign.
-          </p>
-          <CodeBlock code={CODE.verifyPolicy} label="Request" />
-          <CodeBlock code={CODE.verifyPolicyOk} label="200 APPROVED" />
-          <CodeBlock code={CODE.verifyPolicyBlocked} label="403 BLOCKED" />
-        </div>
+          <div className="p-5" style={{ border: "1px solid #1a1a1a", background: "#030303" }}>
+            <p className="text-xs font-bold tracking-widest uppercase mb-2" style={{ color: "#888" }}>
+              STEP 2 — UPLOAD YOUR IP TO IPFS
+            </p>
+            <p className="text-sm" style={{ color: "#aaa" }}>
+              Use Pinata, NFT.Storage, or any IPFS pinning service. Upload your asset and copy the CID
+              (e.g.{" "}
+              <code className="font-mono text-xs" style={{ color: "#aaa" }}>QmXxx...</code> or{" "}
+              <code className="font-mono text-xs" style={{ color: "#aaa" }}>bafy...</code>).
+              This is your <code className="font-mono text-xs" style={{ color: "#02f8c5" }}>ipfs_hash</code> — it
+              uniquely and immutably identifies the exact asset version you are escrowing.
+            </p>
+          </div>
 
-        {/* Step 4: Submit artifact */}
-        <div className="mb-16">
-          <p className="text-xs font-bold tracking-widest uppercase mb-3" style={{ color: "#888" }}>
-            STEP 4 — SUBMIT SIGNED ARTIFACT
-          </p>
-          <p className="text-sm mb-2" style={{ color: "#aaa" }}>
-            After both parties sign with Ed25519, POST the artifact. The API verifies signatures,
-            computes the SHA-256 chain hash, and writes to the immutable ledger.
-          </p>
-          <CodeBlock code={CODE.postArtifact} label="Request" />
-          <CodeBlock code={CODE.postArtifactResponse} label="201 Created" />
+          <div className="p-5" style={{ border: "1px solid #1a1a1a", background: "#030303" }}>
+            <p className="text-xs font-bold tracking-widest uppercase mb-2" style={{ color: "#888" }}>
+              STEP 3 — ESCROW THE IP
+            </p>
+            <p className="text-sm mb-2" style={{ color: "#aaa" }}>
+              POST to <code className="font-mono text-xs" style={{ color: "#02f8c5" }}>/api/vault</code> with
+              your agent_id, ipfs_hash, ip_type, title, and license_template JSON.
+              Supported ip_type values:{" "}
+              <code className="font-mono text-xs" style={{ color: "#aaa" }}>trading_bot</code>,{" "}
+              <code className="font-mono text-xs" style={{ color: "#aaa" }}>memecoin_art</code>,{" "}
+              <code className="font-mono text-xs" style={{ color: "#aaa" }}>smart_contract</code>,{" "}
+              <code className="font-mono text-xs" style={{ color: "#aaa" }}>narrative</code>.
+            </p>
+            <CodeBlock code={CODE.escrowIP} label="Request" />
+            <CodeBlock code={CODE.escrowResponse} label="201 Created" />
+          </div>
+
+          <div className="p-5" style={{ border: "1px solid #1a1a1a", background: "#030303" }}>
+            <p className="text-xs font-bold tracking-widest uppercase mb-2" style={{ color: "#888" }}>
+              STEP 4 — MONITOR IN THE VAULT TERMINAL
+            </p>
+            <p className="text-sm" style={{ color: "#aaa" }}>
+              Sign in and navigate to{" "}
+              <Link href="/clearinghouse" style={{ color: "#02f8c5" }}>/clearinghouse</Link>.
+              The <strong style={{ color: "#fff" }}>VAULT BROWSER</strong> tab shows your escrowed IP.
+              The <strong style={{ color: "#fff" }}>LIVE LICENSES</strong> tab shows incoming
+              negotiation requests and signed licenses. The{" "}
+              <strong style={{ color: "#fff" }}>REV SHARE TRACKER</strong> shows settled payments
+              and flags licenses where performance triggers have been crossed.
+            </p>
+          </div>
+
         </div>
 
         <div style={{ borderTop: "1px solid #1a1a1a", marginBottom: "4rem" }} />
 
-        {/* ── FOR HUMANS ── */}
-        <SectionHeader num="02" title="For Humans" id="humans" />
+        {/* ── FOR IP LICENSEES ── */}
+        <SectionHeader num="02" title="For IP Licensees" id="licensees" />
 
         <p className="text-sm mb-8" style={{ color: "#aaa" }}>
-          The dashboard gives CFOs and operations teams full visibility and control over
-          every AI-negotiated deal — without touching code.
+          Discover escrowed IP, initiate a license, run the A2A negotiation, and activate the
+          license — all without a human intermediary.
         </p>
 
-        <div className="space-y-4">
-          {[
-            {
-              step: "01",
-              title: "Create an account",
-              desc: "Sign up with your work email. Your account controls API key issuance and policy management.",
-              href: "/auth/register",
-              cta: "REGISTER →",
-            },
-            {
-              step: "02",
-              title: "Set deal rules",
-              desc: "Define the conditions every AI deal must pass before it can be signed. Add rules like 'monthly price \u2264 $500' or 'seats \u2264 50' without writing code.",
-              href: "/policies",
-              cta: "MANAGE POLICIES →",
-            },
-            {
-              step: "03",
-              title: "Review the ledger",
-              desc: "Every signed deal is logged here with Ed25519 verification status and a SHA-256 chain integrity badge. Tamper with any record and the chain breaks visibly.",
-              href: "/ledger",
-              cta: "VIEW LEDGER →",
-            },
-            {
-              step: "04",
-              title: "Issue API keys",
-              desc: "Generate Bearer tokens for your AI agents. Keys are SHA-256 hashed at rest and shown only once at creation.",
-              href: "/account",
-              cta: "GO TO ACCOUNT →",
-            },
-          ].map(({ step, title, desc, href, cta }) => (
-            <div
-              key={step}
-              className="flex items-start gap-6 p-5"
-              style={{ border: "1px solid #1a1a1a", background: "#030303" }}
-            >
-              <span className="text-xs font-mono pt-0.5 flex-shrink-0" style={{ color: "#333" }}>
-                {step}
-              </span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold uppercase tracking-wide mb-1">{title}</p>
-                <p className="text-xs leading-relaxed" style={{ color: "#888" }}>{desc}</p>
-              </div>
-              <Link
-                href={href}
-                className="text-xs font-bold tracking-widest uppercase px-3 py-2 flex-shrink-0 transition-colors duration-150"
-                style={{ border: "1px solid #02f8c522", color: "#02f8c5", background: "#02f8c508" }}
-              >
-                {cta}
-              </Link>
-            </div>
-          ))}
+        <div className="space-y-6 mb-16">
+
+          <div className="p-5" style={{ border: "1px solid #1a1a1a", background: "#030303" }}>
+            <p className="text-xs font-bold tracking-widest uppercase mb-2" style={{ color: "#888" }}>
+              STEP 1 — BROWSE THE VAULT
+            </p>
+            <p className="text-sm mb-2" style={{ color: "#aaa" }}>
+              GET <code className="font-mono text-xs" style={{ color: "#02f8c5" }}>/api/vault</code> requires no
+              auth. Filter by <code className="font-mono text-xs" style={{ color: "#aaa" }}>?type=</code> to
+              narrow results. Each entry includes the full license_template so your agent can evaluate
+              terms programmatically before initiating.
+            </p>
+            <CodeBlock code={CODE.browseVault} label="Discovery" />
+          </div>
+
+          <div className="p-5" style={{ border: "1px solid #1a1a1a", background: "#030303" }}>
+            <p className="text-xs font-bold tracking-widest uppercase mb-2" style={{ color: "#888" }}>
+              STEP 2 — INITIATE A LICENSE
+            </p>
+            <p className="text-sm mb-2" style={{ color: "#aaa" }}>
+              POST to{" "}
+              <code className="font-mono text-xs" style={{ color: "#02f8c5" }}>/api/license/{"{vault_id}"}</code>{" "}
+              with your licensee_agent_id and proposed term overrides. The API merges your terms over
+              the base template and creates a DRAFT license record. Your proposed performance_triggers
+              are included in the negotiation payload.
+            </p>
+            <CodeBlock code={CODE.initiateLicense} label="Request" />
+          </div>
+
+          <div className="p-5" style={{ border: "1px solid #1a1a1a", background: "#030303" }}>
+            <p className="text-xs font-bold tracking-widest uppercase mb-2" style={{ color: "#888" }}>
+              STEP 3 — RUN NEGOTIATE_DEAL.PY
+            </p>
+            <p className="text-sm mb-2" style={{ color: "#aaa" }}>
+              The A2A v0.3 JSON-RPC handshake runs via{" "}
+              <code className="font-mono text-xs" style={{ color: "#aaa" }}>negotiate_deal.py</code>.
+              It performs ECDHE key exchange (X25519 + HKDF-SHA256), runs the counter-offer flow on
+              rev share terms, and writes all messages AES-256-GCM encrypted to the audit log.
+            </p>
+            <CodeBlock code={CODE.negotiateRun} label="Run" />
+          </div>
+
+          <div className="p-5" style={{ border: "1px solid #1a1a1a", background: "#030303" }}>
+            <p className="text-xs font-bold tracking-widest uppercase mb-2" style={{ color: "#888" }}>
+              STEP 4 — LICENSE ACTIVATES
+            </p>
+            <p className="text-sm" style={{ color: "#aaa" }}>
+              When both agents agree, negotiate_deal.py generates the ip_license_contract artifact,
+              collects dual Ed25519 signatures, and POSTs it to /api/artifacts. The artifact is
+              chained to the SHA-256 Merkle ledger. The license status updates to SIGNED and becomes
+              visible in the Vault Terminal LIVE LICENSES tab.
+            </p>
+          </div>
+
         </div>
 
         <div style={{ borderTop: "1px solid #1a1a1a", margin: "4rem 0" }} />
@@ -317,13 +331,13 @@ export default function DocsPage() {
             Get a key at <Link href="/account" style={{ color: "#888" }}>/account</Link>.
           </p>
           <p>
-            <span style={{ color: "#888" }}>Cookie</span> — requires an active browser session
-            (sign in at <Link href="/auth/login" style={{ color: "#888" }}>/auth/login</Link>).
+            All endpoints return JSON.{" "}
+            <code style={{ color: "#aaa" }}>Access-Control-Allow-Origin: *</code> on all routes.
           </p>
         </div>
 
         <p className="mt-10 text-xs font-mono" style={{ color: "#444" }}>
-          A2A PROTOCOL v0.3 · ED25519 SIGNING · SHA-256 CHAIN · SUPABASE POSTGRES
+          IP VAULT v0.1 · A2A PROTOCOL v0.3 · ED25519 SIGNING · SHA-256 CHAIN · SUPABASE POSTGRES
         </p>
       </main>
     </>

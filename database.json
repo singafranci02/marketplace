@@ -18,78 +18,16 @@
       },
       "capabilities": [
         {
-          "method": "procurement.evaluate_vendor",
-          "description": "Evaluates a SaaS vendor against buyer requirements and returns a scored assessment.",
-          "params_schema": {
-            "type": "object",
-            "properties": {
-              "vendor_name": {
-                "type": "string",
-                "description": "Name of the SaaS vendor to evaluate"
-              },
-              "requirements": {
-                "type": "string",
-                "description": "JSON string of buyer requirements"
-              },
-              "budget_usd": {
-                "type": "number",
-                "description": "Maximum annual budget in USD"
-              }
-            },
-            "required": [
-              "vendor_name",
-              "requirements"
-            ]
-          },
-          "returns": "VendorAssessment object with score, risks, and recommendation"
+          "method": "ip.escrow_asset",
+          "description": "Escrow trading bot strategies and DeFi automation tools into the vault with configurable rev share terms."
         },
         {
-          "method": "procurement.negotiate_trial",
-          "description": "Negotiates a free or reduced-cost trial period with a SaaS vendor on behalf of the buyer.",
-          "params_schema": {
-            "type": "object",
-            "properties": {
-              "vendor_id": {
-                "type": "string",
-                "description": "Vendor agent ID"
-              },
-              "trial_days": {
-                "type": "number",
-                "description": "Requested trial length in days"
-              },
-              "seats": {
-                "type": "number",
-                "description": "Number of seats required during trial"
-              }
-            },
-            "required": [
-              "vendor_id",
-              "trial_days"
-            ]
-          },
-          "returns": "TrialAgreement object with confirmed terms and start date"
+          "method": "ip.negotiate_license",
+          "description": "Negotiate IP license terms with prospective licensees via A2A v0.3 JSON-RPC."
         },
         {
-          "method": "subscription.manage_renewal",
-          "description": "Handles SaaS subscription renewal, renegotiation, or cancellation.",
-          "params_schema": {
-            "type": "object",
-            "properties": {
-              "subscription_id": {
-                "type": "string",
-                "description": "Existing subscription identifier"
-              },
-              "action": {
-                "type": "string",
-                "description": "One of: renew, renegotiate, cancel"
-              }
-            },
-            "required": [
-              "subscription_id",
-              "action"
-            ]
-          },
-          "returns": "SubscriptionStatus with updated terms"
+          "method": "ip.settle_rev_share",
+          "description": "Settle accumulated rev share payments and update license performance triggers."
         }
       ],
       "policy_endpoint": "https://policy.sydneysaas.io/a2a/deals/approve",
@@ -98,7 +36,7 @@
         "SOC2-Type2",
         "Privacy Act 1988"
       ],
-      "description": "Specialist AI agent for SaaS procurement and subscription lifecycle management. Evaluates, negotiates, and onboards SaaS vendors for enterprise buyers across APAC.",
+      "description": "IP licensor agent specialising in trading bot strategies and DeFi automation tools for the APAC memecoin market. Escrows, licenses, and collects rev share autonomously.",
       "endpoint": "https://api.sydneysaas.io/a2a",
       "pricing": {
         "model": "per-deal",
@@ -125,62 +63,12 @@
       },
       "capabilities": [
         {
-          "method": "freight.get_quote",
-          "description": "Returns a binding freight quote for a given shipment specification.",
-          "params_schema": {
-            "type": "object",
-            "properties": {
-              "origin": {
-                "type": "string",
-                "description": "Origin port or city"
-              },
-              "destination": {
-                "type": "string",
-                "description": "Destination port or city"
-              },
-              "cargo_kg": {
-                "type": "number",
-                "description": "Cargo weight in kilograms"
-              },
-              "incoterm": {
-                "type": "string",
-                "description": "Incoterm code, e.g. FOB, CIF, DAP"
-              }
-            },
-            "required": [
-              "origin",
-              "destination",
-              "cargo_kg"
-            ]
-          },
-          "returns": "FreightQuote with price, transit days, and carrier options"
+          "method": "ip.escrow_asset",
+          "description": "Escrow memecoin art packs and narrative assets with commercial license terms."
         },
         {
-          "method": "customs.prepare_documentation",
-          "description": "Generates and validates customs documentation for cross-border shipments.",
-          "params_schema": {
-            "type": "object",
-            "properties": {
-              "shipment_id": {
-                "type": "string",
-                "description": "Internal shipment reference"
-              },
-              "hs_code": {
-                "type": "string",
-                "description": "Harmonised System commodity code"
-              },
-              "country_of_origin": {
-                "type": "string",
-                "description": "ISO 3166-1 alpha-2 country code"
-              }
-            },
-            "required": [
-              "shipment_id",
-              "hs_code",
-              "country_of_origin"
-            ]
-          },
-          "returns": "DocumentPackage with customs declaration, commercial invoice, and packing list"
+          "method": "ip.negotiate_license",
+          "description": "Negotiate usage rights for art assets via A2A protocol."
         }
       ],
       "policy_endpoint": "https://policy.globalfreight.eu/a2a/deals/approve",
@@ -189,7 +77,7 @@
         "GDPR-Compliant",
         "AEO-Certified"
       ],
-      "description": "Enterprise logistics agent specialising in cross-border freight coordination, customs documentation, and real-time supply chain optimisation for EU and global routes.",
+      "description": "IP licensor agent for memecoin art packs, narrative assets, and brand identity kits. Specialises in short-duration commercial licenses for token launches in EU markets.",
       "endpoint": "https://api.globalfreight.eu/a2a",
       "pricing": {
         "model": "per-shipment",
@@ -216,73 +104,16 @@
       },
       "capabilities": [
         {
-          "method": "infra.provision_environment",
-          "description": "Provisions a cloud environment (VPC, compute, storage) based on a specification.",
-          "params_schema": {
-            "type": "object",
-            "properties": {
-              "cloud_provider": {
-                "type": "string",
-                "description": "One of: aws, gcp, azure"
-              },
-              "environment_type": {
-                "type": "string",
-                "description": "One of: dev, staging, production"
-              },
-              "spec": {
-                "type": "string",
-                "description": "JSON string of infrastructure specification"
-              }
-            },
-            "required": [
-              "cloud_provider",
-              "environment_type",
-              "spec"
-            ]
-          },
-          "returns": "ProvisioningResult with resource IDs and connection strings"
+          "method": "ip.escrow_asset",
+          "description": "Escrow audited Solidity contract templates and cloud infrastructure scripts."
         },
         {
-          "method": "cost.optimise",
-          "description": "Analyses cloud spend and returns a prioritised list of cost-saving recommendations.",
-          "params_schema": {
-            "type": "object",
-            "properties": {
-              "account_id": {
-                "type": "string",
-                "description": "Cloud account or project ID"
-              },
-              "lookback_days": {
-                "type": "number",
-                "description": "Number of days of spend data to analyse"
-              }
-            },
-            "required": [
-              "account_id"
-            ]
-          },
-          "returns": "OptimisationReport with estimated savings and action items"
+          "method": "ip.audit_license",
+          "description": "Audit active license terms and flag performance trigger breaches."
         },
         {
-          "method": "security.run_audit",
-          "description": "Runs a compliance audit against a specified framework and returns findings.",
-          "params_schema": {
-            "type": "object",
-            "properties": {
-              "framework": {
-                "type": "string",
-                "description": "Compliance framework, e.g. SOC2, NIST-800-53, FedRAMP"
-              },
-              "scope": {
-                "type": "string",
-                "description": "Comma-separated list of services to audit"
-              }
-            },
-            "required": [
-              "framework"
-            ]
-          },
-          "returns": "AuditReport with findings, severity levels, and remediation steps"
+          "method": "ip.optimise_terms",
+          "description": "Analyse historical license performance and recommend optimised rev share structures."
         }
       ],
       "policy_endpoint": "https://policy.cloudops.ai/a2a/deals/approve",
@@ -291,7 +122,7 @@
         "FedRAMP-Moderate",
         "NIST-800-53"
       ],
-      "description": "Cloud operations AI agent providing automated infrastructure provisioning, cost optimisation analysis, and security compliance auditing across AWS, GCP, and Azure environments.",
+      "description": "IP licensor agent providing audited smart contract templates, MEV protection scripts, and cloud automation tools. FedRAMP-aligned with on-chain settlement support.",
       "endpoint": "https://api.cloudops.ai/a2a",
       "pricing": {
         "model": "monthly-retainer",
@@ -316,12 +147,21 @@
         "certificate_id": "cert-mp-004-us-acmecorpbuyer",
         "signature": "placeholder_buyer_cert"
       },
-      "capabilities": [],
+      "capabilities": [
+        {
+          "method": "ip.discover_vault",
+          "description": "Search the IP vault for trading bots and smart contracts matching Acme Corp's deployment criteria."
+        },
+        {
+          "method": "ip.request_license",
+          "description": "Initiate and negotiate IP license terms on behalf of Acme Corp's DeFi operations team."
+        }
+      ],
       "policy_endpoint": "https://policy.acmecorp.com/a2a/deals/approve",
       "compliance": [
         "SOC2-Type2"
       ],
-      "description": "Procurement buyer agent for Acme Corp. Discovers, negotiates, and commits to SaaS and service contracts on behalf of the company.",
+      "description": "IP licensee agent for Acme Corp. Autonomously discovers, negotiates, and activates crypto IP licenses — trading bots, smart contracts, and memecoin art — for Acme Corp's DeFi operations.",
       "endpoint": "https://agents.acmecorp.com/a2a",
       "pricing": null,
       "verified": true,
