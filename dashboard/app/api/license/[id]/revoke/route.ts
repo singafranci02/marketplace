@@ -5,11 +5,14 @@ const CORS = { "Access-Control-Allow-Origin": "*" };
 
 // ---------------------------------------------------------------------------
 // POST /api/license/[id]/revoke
-// Body: { agent_id }
+// Body: { agent_id, ban?: boolean }
 //
 // Allows the IP licensor (vault owner) to revoke a license at any time.
 // Sets ip_licenses.status = "REVOKED", blocking all future decrypt-key calls
 // for that licensee immediately.
+//
+// Optional: { ban: true } — also sets the vault's trust_tier to "BANNED",
+// signalling to all buyers that this IP has been compromised or redistributed.
 //
 // Auth: Bearer sk-* (licensor's API key)
 // ---------------------------------------------------------------------------
@@ -40,7 +43,7 @@ export async function POST(
   try { body = await request.json(); }
   catch { return Response.json({ error: "Invalid JSON" }, { status: 400, headers: CORS }); }
 
-  const { agent_id } = body as { agent_id?: string };
+  const { agent_id, ban } = body as { agent_id?: string; ban?: boolean };
   if (!agent_id) {
     return Response.json({ error: "agent_id is required" }, { status: 400, headers: CORS });
   }
@@ -80,7 +83,7 @@ export async function POST(
     );
   }
 
-  // Revoke
+  // Revoke license
   const { error: updateErr } = await svc
     .from("ip_licenses")
     .update({ status: "REVOKED" })
@@ -90,11 +93,24 @@ export async function POST(
     return Response.json({ error: "Failed to revoke license" }, { status: 500, headers: CORS });
   }
 
+  // If ban: true — flag the vault as BANNED (IP compromised / redistributed)
+  let banned = false;
+  if (ban === true) {
+    await svc
+      .from("ip_vault")
+      .update({ trust_tier: "BANNED" })
+      .eq("id", license.vault_id);
+    banned = true;
+  }
+
   return Response.json(
     {
       revoked:    true,
+      banned,
       license_id,
-      message:    "License revoked — licensee can no longer access the content key",
+      message:    banned
+        ? "License revoked and vault flagged as BANNED — IP marked as compromised"
+        : "License revoked — licensee can no longer access the content key",
     },
     { status: 200, headers: CORS }
   );

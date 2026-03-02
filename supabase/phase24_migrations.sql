@@ -1,0 +1,23 @@
+-- Phase 24 — Cryptographic Access Gate
+-- Run in the Supabase SQL Editor (https://supabase.com/dashboard)
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- No schema changes required for Phase 24.
+--
+-- ip_vault.trust_tier is already a text column (added in Phase 22).
+-- The new "BANNED" tier is simply a new text value — no ALTER needed.
+--
+-- Summary of what Phase 24 adds:
+--   • decrypt-key endpoint: wrapped key delivery (Ed25519→X25519 ECDH)
+--     Content key is never returned in plaintext.
+--   • /api/license/check: lightweight validity check (no download quota cost)
+--   • /api/license/[id]/revoke: optional { ban: true } sets trust_tier=BANNED
+--   • license_validator.py: Python utility licensors ship inside their IP
+--   • BANNED trust tier in clearinghouse UI (hard red ⊗ badge)
+--
+-- If you need to manually flag a vault as BANNED (IP compromised):
+--   UPDATE ip_vault SET trust_tier = 'BANNED' WHERE id = '<vault-uuid>';
+--
+-- To clear a BANNED flag (after investigation):
+--   UPDATE ip_vault SET trust_tier = 'AUDITED' WHERE id = '<vault-uuid>';
+-- ─────────────────────────────────────────────────────────────────────────────

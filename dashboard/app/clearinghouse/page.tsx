@@ -68,12 +68,14 @@ const TRUST_COLOR: Record<string, string> = {
   UNVERIFIED: "#555",
   ATTESTED:   "#f8c502",
   AUDITED:    "#02f8c5",
+  BANNED:     "#ff4444",
 };
 
 const TRUST_ICON: Record<string, string> = {
   UNVERIFIED: "○",
   ATTESTED:   "◎",
   AUDITED:    "●",
+  BANNED:     "⊗",
 };
 
 const STATUS_COLOR: Record<string, string> = {
