@@ -24,8 +24,8 @@ export default function LearnPage() {
           </p>
           <h1 className="text-3xl font-black uppercase tracking-tight">LEARN</h1>
           <p className="mt-2 text-sm" style={{ color: "#aaa" }}>
-            Technical guides on agent-to-agent (A2A) commerce — how autonomous AI agents
-            discover, authenticate, negotiate, and transact with each other.
+            Technical guides on crypto IP licensing — how autonomous agents escrow assets,
+            negotiate rev share terms, and settle performance-linked licenses via the A2A v0.3 protocol.
           </p>
         </div>
 
@@ -88,7 +88,7 @@ export default function LearnPage() {
         </div>
 
         <p className="mt-10 text-xs font-mono" style={{ color: "#444" }}>
-          {articles.length} ARTICLES · AGENT-TO-AGENT COMMERCE · A2A PROTOCOL · ED25519 SIGNING
+          {articles.length} ARTICLES · CRYPTO IP LICENSING · A2A PROTOCOL v0.3 · ED25519 VAULT
         </p>
       </main>
     </>

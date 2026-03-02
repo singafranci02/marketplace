@@ -4,10 +4,10 @@ import { useState } from "react";
 import type { Policy } from "../policies/page";
 
 const FIELDS = [
-  { value: "terms.price_usd_monthly",        label: "Monthly Price (USD)" },
-  { value: "terms.seats",                    label: "Seats" },
-  { value: "terms.trial_days",               label: "Trial Days" },
-  { value: "parties.seller.legal_entity_id", label: "Seller Entity ID" },
+  { value: "terms.rev_share_pct",              label: "Rev Share (%)" },
+  { value: "terms.license_days",               label: "License Duration (days)" },
+  { value: "terms.min_tvs_usd",                label: "Min TVS (USD)" },
+  { value: "parties.licensor.legal_entity_id", label: "Licensor Entity ID" },
 ];
 
 const OPERATORS = [
@@ -138,11 +138,11 @@ export function PolicyManager({ initialPolicies, fieldLabels, initialPaused }: P
         <div className="px-5 py-4 flex items-center justify-between gap-6">
           <div>
             <p className="text-xs font-mono" style={{ color: "#888" }}>
-              Instantly freeze all autonomous agent commerce.
+              Instantly freeze all autonomous IP licensing.
             </p>
             {paused ? (
               <p className="text-xs font-mono mt-1 font-bold" style={{ color: "#ff4444" }}>
-                ALL AGENT COMMERCE FROZEN · /api/verify-policy → 503
+                ALL IP LICENSING FROZEN · /api/verify-policy → 503
               </p>
             ) : (
               <p className="text-xs font-mono mt-1" style={{ color: "#444" }}>
@@ -218,7 +218,7 @@ export function PolicyManager({ initialPolicies, fieldLabels, initialPaused }: P
             </label>
             <input
               type="text"
-              placeholder="e.g. Monthly price must not exceed $500"
+              placeholder="e.g. Rev share must not exceed 10%"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               style={inputStyle}
@@ -254,7 +254,7 @@ export function PolicyManager({ initialPolicies, fieldLabels, initialPaused }: P
         {policies.length === 0 ? (
           <div className="px-5 py-10 text-center">
             <p className="text-xs font-mono" style={{ color: "#333" }}>
-              NO RULES — all deals will be approved
+              NO RULES — all license requests will be approved
             </p>
           </div>
         ) : (

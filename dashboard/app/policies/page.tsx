@@ -33,10 +33,10 @@ async function getKillSwitch(): Promise<boolean> {
 }
 
 const FIELD_LABELS: Record<string, string> = {
-  "terms.price_usd_monthly":        "Monthly Price (USD)",
-  "terms.seats":                    "Seats",
-  "terms.trial_days":               "Trial Days",
-  "parties.seller.legal_entity_id": "Seller Entity ID",
+  "terms.rev_share_pct":              "Rev Share (%)",
+  "terms.license_days":               "License Duration (days)",
+  "terms.min_tvs_usd":                "Min TVS (USD)",
+  "parties.licensor.legal_entity_id": "Licensor Entity ID",
 };
 
 export default async function PoliciesPage() {
@@ -52,10 +52,10 @@ export default async function PoliciesPage() {
           <p className="text-xs font-mono tracking-widest uppercase mb-2" style={{ color: "#02f8c5" }}>
             POLICY ENGINE
           </p>
-          <h1 className="text-3xl font-black uppercase tracking-tight">DEAL RULES</h1>
+          <h1 className="text-3xl font-black uppercase tracking-tight">LICENSE POLICIES</h1>
           <p className="mt-2 text-sm" style={{ color: "#aaa" }}>
-            Rules evaluated before every deal is signed. If any rule fails, the agent is
-            blocked from signing — no code changes required.
+            Rules evaluated before every IP license artifact is signed. If any rule fails, the agent is
+            blocked from activating the license — no code changes required.
           </p>
         </div>
 

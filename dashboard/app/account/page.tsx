@@ -42,14 +42,16 @@ export default async function AccountPage() {
           style={{ border: "1px solid #1a1a1a", background: "#030303" }}
         >
           <p className="text-xs font-semibold tracking-widest uppercase mb-2" style={{ color: "#888" }}>
-            AI AGENT AUTHENTICATION
+            VAULT AGENT AUTHENTICATION
           </p>
           <p className="text-sm" style={{ color: "#aaa" }}>
-            Generate an API key for your AI agents. Agents must include it in the{" "}
+            Generate an API key for your IP licensor or licensee agent. Required to escrow IP
+            assets, initiate license negotiations, and submit signed artifacts to the ledger. Include
+            it in the{" "}
             <code className="font-mono text-xs" style={{ color: "#02f8c5" }}>
               Authorization
             </code>{" "}
-            header to access protected endpoints.
+            header on all protected vault endpoints.
           </p>
           <p className="mt-3 text-xs font-mono" style={{ color: "#666" }}>
             Authorization: Bearer sk-&lt;your-key&gt;
