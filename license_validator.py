@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import os
 import sys
 import uuid
 from typing import Optional
@@ -148,6 +149,55 @@ def _get_solana_pubkey(agent_id: str, db_path: Optional[str] = None) -> Optional
     return None
 
 
+def _verify_cnft_on_chain(agent_wallet: str, asset_id: str, rpc_url: str) -> bool:
+    """
+    Phase 29: Belt-and-suspenders on-chain cNFT ownership verification.
+
+    Calls the Metaplex Digital Asset Standard (DAS) API `getAsset` method via
+    JSON-RPC POST to confirm the blockchain truth of cNFT ownership.
+
+    Behavior:
+      - Returns True  if RPC confirms agent_wallet is the current owner.
+      - Returns True  (pass-through) if the RPC does not support DAS (e.g. standard
+        devnet endpoint). Execution is not blocked; Supabase token_holder is enough.
+      - Returns False if the RPC confirms a *different* owner — the NFT was transferred.
+      - Returns True  on any network / parse error (fail-open to avoid outages).
+
+    For full on-chain verification, point SOLANA_RPC_URL at a DAS-enabled provider
+    such as Helius (https://www.helius.dev) or QuickNode.
+    """
+    try:
+        resp = requests.post(
+            rpc_url,
+            json={
+                "jsonrpc": "2.0",
+                "id":      "cnft-ownership-check",
+                "method":  "getAsset",
+                "params":  {"id": asset_id},
+            },
+            timeout=8,
+        )
+        if resp.status_code != 200:
+            return True  # RPC unavailable — fail-open
+
+        data = resp.json()
+
+        # If the RPC doesn't support DAS it returns an error object
+        if "error" in data or "result" not in data:
+            return True  # DAS not supported on this RPC — pass-through
+
+        result = data["result"]
+        owner  = result.get("ownership", {}).get("owner")
+
+        if owner is None:
+            return True  # incomplete response — pass-through
+
+        return owner == agent_wallet
+
+    except Exception:
+        return True  # network / JSON error — fail-open, do not block
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # LicenseValidator
 # ─────────────────────────────────────────────────────────────────────────────
@@ -232,7 +282,7 @@ class LicenseValidator:
                 return False
             data = resp.json()
 
-            # Phase 28: cNFT token-gating check (primary)
+            # Phase 28: cNFT token-gating check (primary — Supabase mirror)
             if data.get("cnft_asset_id") and data.get("token_holder"):
                 local_wallet = _get_solana_pubkey(self.agent_id)
                 if local_wallet and local_wallet != data["token_holder"]:
@@ -241,6 +291,17 @@ class LicenseValidator:
                         "longer held by this agent. If the NFT was transferred or sold, access "
                         "has been revoked. Contact the original licensor."
                     )
+
+                # Phase 29: belt-and-suspenders — confirm on-chain via Metaplex DAS API
+                if local_wallet:
+                    rpc_url     = os.environ.get("SOLANA_RPC_URL", "https://api.devnet.solana.com")
+                    on_chain_ok = _verify_cnft_on_chain(local_wallet, data["cnft_asset_id"], rpc_url)
+                    if not on_chain_ok:
+                        raise SecurityException(
+                            "[LICENSE DENIED] On-chain cNFT ownership verification failed — "
+                            "the Solana blockchain confirms this NFT is no longer in your wallet. "
+                            "If you transferred the NFT, you have permanently lost access to this IP."
+                        )
 
             # Phase 27 backward compat: hardware binding (for pre-Phase 28 licenses)
             elif verify_hardware and data.get("hardware_id"):

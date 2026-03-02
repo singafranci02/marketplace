@@ -15,6 +15,76 @@ interface AgentCard {
   verified: boolean;
   joined_at: string;
   status?: "ACTIVE" | "INACTIVE";
+  liquidity_score_sol?: string;  // Phase 29: multi-factor DeFi score
+  trust_tier?: string;           // Phase 29: UNVERIFIED | ATTESTED | AUDITED | STAKED
+}
+
+const TIER_COLORS: Record<string, string> = {
+  STAKED:     "#f8c502",
+  AUDITED:    "#02f8c5",
+  ATTESTED:   "#888",
+  UNVERIFIED: "#444",
+};
+
+function TrustTierBadge({ tier }: { tier: string }) {
+  const color = TIER_COLORS[tier] ?? "#444";
+  return (
+    <span
+      className="text-xs font-mono px-1.5 py-0.5"
+      style={{
+        color,
+        border:     `1px solid ${color}33`,
+        background: `${color}0a`,
+        letterSpacing: "0.04em",
+      }}
+    >
+      {tier}
+    </span>
+  );
+}
+
+function PowerLevelBar({ score }: { score: string }) {
+  const val  = parseFloat(score) || 0;
+  // Normalize: 100 SOL score = full bar
+  const pct  = Math.min(val / 100, 1) * 100;
+  const color = val === 0 ? "#222" : "#02f8c5";
+
+  return (
+    <div>
+      <div
+        style={{
+          display:        "flex",
+          justifyContent: "space-between",
+          marginBottom:   4,
+        }}
+      >
+        <span
+          style={{
+            fontSize:      10,
+            color:         "#555",
+            fontFamily:    "monospace",
+            letterSpacing: "0.08em",
+          }}
+        >
+          POWER LEVEL
+        </span>
+        <span style={{ fontSize: 10, color: "#888", fontFamily: "monospace" }}>
+          {val.toFixed(4)}
+        </span>
+      </div>
+      <div style={{ height: 2, background: "#111" }}>
+        <div
+          style={{
+            height:     "100%",
+            width:      `${pct}%`,
+            background: color,
+            boxShadow:  pct > 0 ? `0 0 4px ${color}` : "none",
+            transition: "width 0.6s ease",
+          }}
+        />
+      </div>
+    </div>
+  );
 }
 
 function ComplianceBadge({ label }: { label: string }) {
@@ -73,7 +143,7 @@ export function AgentGrid({ agents }: { agents: AgentCard[] }) {
                   {agent.owner}
                 </p>
               </div>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 flex-wrap justify-end">
                 <span
                   className="text-xs font-mono px-1.5 py-0.5"
                   style={{
@@ -84,6 +154,9 @@ export function AgentGrid({ agents }: { agents: AgentCard[] }) {
                 >
                   {agent.status === "INACTIVE" ? "OFFLINE" : "LIVE"}
                 </span>
+                {agent.trust_tier && (
+                  <TrustTierBadge tier={agent.trust_tier} />
+                )}
                 {agent.verified && (
                   <span
                     className="text-xs font-mono px-1.5 py-0.5 rounded-sm"
@@ -118,6 +191,11 @@ export function AgentGrid({ agents }: { agents: AgentCard[] }) {
                 <ComplianceBadge key={c} label={c} />
               ))}
             </div>
+
+            {/* Power Level bar — Phase 29 */}
+            {agent.liquidity_score_sol !== undefined && (
+              <PowerLevelBar score={agent.liquidity_score_sol} />
+            )}
 
             {/* Footer */}
             <div

@@ -63,12 +63,15 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // ── Liveness + Liquidity Score ───────────────────────────────────────────
+  // ── Liveness + Enhanced Liquidity Score (Phase 29) ───────────────────────
   const serviceUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  const heartbeatMap:       Record<string, string> = {};
-  const liquidityMap:       Record<string, number> = {};  // agent_id → total lamports processed
+  const heartbeatMap:  Record<string, string> = {};
+  const liquidityMap:  Record<string, number> = {};  // agent_id → total lamports processed
+  const dealCountMap:  Record<string, number> = {};  // agent_id → VERIFIED_ON_CHAIN deal count (T_active_bonus)
+  const successMap:    Record<string, { settled: number; total: number }> = {};
+  const stakeMap:      Record<string, number> = {};  // agent_id → lamports_staked
 
   if (serviceUrl && serviceKey) {
     const svc = createServiceClient(serviceUrl, serviceKey);
@@ -81,7 +84,7 @@ export async function GET(req: NextRequest) {
       heartbeatMap[row.agent_id] = row.last_seen_at;
     }
 
-    // Liquidity Score: sum amount_lamports per seller agent from verified ledger entries
+    // Liquidity + T_active_bonus: sum amount_lamports and count deals per seller agent
     const { data: ledgerData } = await svc
       .from("ledger")
       .select("artifact, amount_lamports")
@@ -93,7 +96,28 @@ export async function GET(req: NextRequest) {
       const sellerId = artifact?.parties?.licensor?.agent_id;
       if (sellerId && row.amount_lamports) {
         liquidityMap[sellerId] = (liquidityMap[sellerId] ?? 0) + Number(row.amount_lamports);
+        dealCountMap[sellerId] = (dealCountMap[sellerId] ?? 0) + 1;
       }
+    }
+
+    // Success rate: count SETTLED vs total licenses per licensor agent
+    const { data: licenseData } = await svc
+      .from("ip_licenses")
+      .select("licensor_agent_id, status");
+    for (const row of licenseData ?? []) {
+      const agentId = row.licensor_agent_id as string | null;
+      if (!agentId) continue;
+      if (!successMap[agentId]) successMap[agentId] = { settled: 0, total: 0 };
+      successMap[agentId].total += 1;
+      if (row.status === "SETTLED") successMap[agentId].settled += 1;
+    }
+
+    // Stake weight: lamports staked per agent
+    const { data: stakesData } = await svc
+      .from("agent_stakes")
+      .select("agent_id, lamports_staked");
+    for (const row of stakesData ?? []) {
+      stakeMap[row.agent_id] = Number(row.lamports_staked);
     }
   }
 
@@ -107,14 +131,38 @@ export async function GET(req: NextRequest) {
     const active   = hasAnyHeartbeat
       ? (lastSeen ? now - new Date(lastSeen).getTime() < STALE_MS : false)
       : true;
-    const lamports          = liquidityMap[agentId] ?? 0;
-    const liquidity_score_sol = (lamports / 1e9).toFixed(4);
+
+    // Phase 29: Enhanced Liquidity Score
+    // Score = (V_sol × success_rate) + (T_active_bonus × W_stake)
+    const v_sol            = (liquidityMap[agentId] ?? 0) / 1e9;
+    const { settled, total } = successMap[agentId] ?? { settled: 0, total: 0 };
+    const success_rate     = total > 0 ? settled / total : 1.0;
+    const t_active         = dealCountMap[agentId] ?? 0;
+    const staked_lamps     = stakeMap[agentId] ?? 0;
+    const w_stake          = Math.min(1.0 + (staked_lamps / 1e9) / 10.0, 2.0);
+    const score            = (v_sol * success_rate) + (t_active * w_stake);
+    const liquidity_score_sol = score.toFixed(4);
+
+    // Trust tier
+    const agentCompliance = (a["compliance"] as string[]) ?? [];
+    const staked_sol = staked_lamps / 1e9;
+    let trust_tier: string;
+    if (staked_sol > 0) {
+      trust_tier = "STAKED";
+    } else if (v_sol > 0 && success_rate > 0 && (agentCompliance.includes("SOC2-Type2") || agentCompliance.includes("ISO27001"))) {
+      trust_tier = "AUDITED";
+    } else if (agentCompliance.length > 0) {
+      trust_tier = "ATTESTED";
+    } else {
+      trust_tier = "UNVERIFIED";
+    }
 
     return {
       ...a,
       status:              active ? "ACTIVE" : "INACTIVE",
       last_seen:           lastSeen ?? null,
-      liquidity_score_sol, // Phase 28: total SOL processed through the clearinghouse
+      liquidity_score_sol, // Phase 29: multi-factor score
+      trust_tier,          // Phase 29: UNVERIFIED | ATTESTED | AUDITED | STAKED
     };
   });
 
