@@ -5,19 +5,20 @@ import { createHash } from "crypto";
 const CORS = { "Access-Control-Allow-Origin": "*" };
 
 // ---------------------------------------------------------------------------
-// POST — initiate license negotiation
+// POST /api/license/[id] — initiate license negotiation
+// [id] here is the vault_id
 // ---------------------------------------------------------------------------
 
 export async function POST(
   request: Request,
-  { params }: { params: Promise<{ vault_id: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const authorized = await checkAuth(request);
   if (!authorized) {
     return Response.json({ error: "Unauthorized" }, { status: 401, headers: CORS });
   }
 
-  const { vault_id } = await params;
+  const { id: vault_id } = await params;
 
   let body: Record<string, unknown>;
   try { body = await request.json(); }
