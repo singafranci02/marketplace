@@ -305,7 +305,11 @@ export default async function ClearinghousePage({
                     <div
                       key={vault.id}
                       className="p-5 space-y-3"
-                      style={{ border: "1px solid #1a1a1a", background: "#030303" }}
+                      style={{
+                        border:     vault.escrow_eth > 0 ? "1px solid #02f8c544" : "1px solid #1a1a1a",
+                        background: vault.escrow_eth > 0 ? "#02f8c503"           : "#030303",
+                        boxShadow:  vault.escrow_eth > 0 ? "0 0 12px #02f8c518"  : "none",
+                      }}
                     >
                       {/* Badge + status */}
                       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -328,6 +332,14 @@ export default async function ClearinghousePage({
                               </span>
                             );
                           })()}
+                          {vault.escrow_eth > 0 && (
+                            <span
+                              className="text-xs font-mono px-2 py-0.5"
+                              style={{ color: "#02f8c5", border: "1px solid #02f8c544", background: "#02f8c508" }}
+                            >
+                              ⬡ STAKED {vault.escrow_eth} ETH
+                            </span>
+                          )}
                           {vault.content_key_encrypted && (
                             <span
                               className="text-xs font-mono px-2 py-0.5"
