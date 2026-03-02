@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
 
@@ -18,14 +18,15 @@ const APP_LINKS: NavLink[] = [
   { label: "LEDGER",        href: "/ledger" },
   { label: "CLEARINGHOUSE", href: "/clearinghouse" },
   { label: "POLICIES",      href: "/policies" },
-  { label: "DEVELOPER",     href: "/developer" },
   { label: "LEARN",         href: "/learn" },
   { label: "DOCS",          href: "/docs" },
 ];
 
 export function Nav() {
-  const [user, setUser] = useState<User | null>(null);
-  const supabase = createClient();
+  const [user, setUser]   = useState<User | null>(null);
+  const [open, setOpen]   = useState(false);
+  const dropdownRef       = useRef<HTMLDivElement>(null);
+  const supabase          = createClient();
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => setUser(user));
@@ -40,11 +41,16 @@ export function Nav() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const truncatedEmail = user?.email
-    ? user.email.length > 22
-      ? user.email.slice(0, 19) + "..."
-      : user.email
-    : null;
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    if (open) document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, [open]);
 
   return (
     <nav
@@ -78,17 +84,111 @@ export function Nav() {
         {user ? (
           <>
             <span style={{ borderLeft: "1px solid #1a1a1a", height: "1rem" }} />
-            <Link href="/account" className="nav-link text-xs font-semibold uppercase">
-              ACCOUNT
-            </Link>
-            <span className="text-xs font-mono" style={{ color: "#555" }}>
-              {truncatedEmail}
-            </span>
-            <form method="POST" action="/auth/signout">
-              <button type="submit" className="nav-link text-xs font-semibold uppercase">
-                SIGN OUT
+
+            {/* Account dropdown */}
+            <div ref={dropdownRef} style={{ position: "relative" }}>
+              <button
+                onClick={() => setOpen((v) => !v)}
+                className="nav-link text-xs font-semibold uppercase"
+                style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", padding: 0 }}
+              >
+                ACCOUNT
+                <span style={{ fontSize: 8, color: "#555", marginTop: 1 }}>{open ? "▴" : "▾"}</span>
               </button>
-            </form>
+
+              {open && (
+                <div
+                  style={{
+                    position:  "absolute",
+                    top:       "calc(100% + 12px)",
+                    right:     0,
+                    minWidth:  200,
+                    background:"#050505",
+                    border:    "1px solid #1a1a1a",
+                    zIndex:    100,
+                  }}
+                >
+                  {/* Email */}
+                  <div
+                    style={{
+                      padding:     "10px 14px",
+                      borderBottom:"1px solid #1a1a1a",
+                    }}
+                  >
+                    <p style={{ fontSize: 10, color: "#555", fontFamily: "monospace", marginBottom: 2, letterSpacing: "0.06em" }}>
+                      SIGNED IN AS
+                    </p>
+                    <p style={{ fontSize: 11, color: "#888", fontFamily: "monospace", wordBreak: "break-all" }}>
+                      {user.email}
+                    </p>
+                  </div>
+
+                  {/* Links */}
+                  <div style={{ padding: "4px 0" }}>
+                    <Link
+                      href="/account"
+                      onClick={() => setOpen(false)}
+                      style={{
+                        display:     "block",
+                        padding:     "8px 14px",
+                        fontSize:    11,
+                        fontFamily:  "monospace",
+                        color:       "#aaa",
+                        letterSpacing:"0.06em",
+                        textDecoration:"none",
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = "#0a0a0a")}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
+                    >
+                      Account &amp; API Keys →
+                    </Link>
+                    <Link
+                      href="/developer"
+                      onClick={() => setOpen(false)}
+                      style={{
+                        display:     "block",
+                        padding:     "8px 14px",
+                        fontSize:    11,
+                        fontFamily:  "monospace",
+                        color:       "#aaa",
+                        letterSpacing:"0.06em",
+                        textDecoration:"none",
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = "#0a0a0a")}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
+                    >
+                      Developer Settings →
+                    </Link>
+                  </div>
+
+                  {/* Sign out */}
+                  <div style={{ borderTop: "1px solid #1a1a1a", padding: "4px 0" }}>
+                    <form method="POST" action="/auth/signout">
+                      <button
+                        type="submit"
+                        style={{
+                          display:     "block",
+                          width:       "100%",
+                          textAlign:   "left",
+                          padding:     "8px 14px",
+                          fontSize:    11,
+                          fontFamily:  "monospace",
+                          color:       "#666",
+                          letterSpacing:"0.06em",
+                          background:  "none",
+                          border:      "none",
+                          cursor:      "pointer",
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = "#0a0a0a")}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
+                      >
+                        Sign Out
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              )}
+            </div>
           </>
         ) : (
           <>
