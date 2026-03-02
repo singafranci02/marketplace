@@ -169,10 +169,26 @@ export default async function ClearinghousePage({
   // Build vault lookup for license tab
   const vaultMap = Object.fromEntries(allVaults.map(v => [v.id, v.title]));
 
+  // Leaderboard: sum escrow_eth per owner_agent_id, sorted descending
+  const leaderboard = Object.values(
+    rawVaults.reduce<Record<string, { agent_id: string; total_eth: number; ip_count: number }>>(
+      (acc, v) => {
+        if (!acc[v.owner_agent_id]) {
+          acc[v.owner_agent_id] = { agent_id: v.owner_agent_id, total_eth: 0, ip_count: 0 };
+        }
+        acc[v.owner_agent_id].total_eth += v.escrow_eth ?? 0;
+        acc[v.owner_agent_id].ip_count  += 1;
+        return acc;
+      },
+      {}
+    )
+  ).sort((a, b) => b.total_eth - a.total_eth);
+
   const TABS = [
-    { id: "vault",    label: "VAULT BROWSER" },
-    { id: "licenses", label: "LIVE LICENSES" },
-    { id: "revshare", label: "REV SHARE TRACKER" },
+    { id: "vault",       label: "VAULT BROWSER" },
+    { id: "licenses",    label: "LIVE LICENSES" },
+    { id: "revshare",    label: "REV SHARE TRACKER" },
+    { id: "leaderboard", label: "LEADERBOARD" },
   ];
 
   const TYPE_FILTERS = [
@@ -569,6 +585,78 @@ export default async function ClearinghousePage({
                 </tbody>
               </table>
             </div>
+          </section>
+        )}
+
+        {/* ── LEADERBOARD TAB ─────────────────────────────────────────── */}
+        {tab === "leaderboard" && (
+          <section>
+            <div className="mb-6">
+              <p className="text-xs font-mono tracking-widest uppercase mb-1" style={{ color: "#02f8c5" }}>
+                ALPHA LEADERBOARD
+              </p>
+              <h2 className="text-xl font-black uppercase tracking-tight">TOP EARNERS — ETH ESCROWED PER LICENSOR</h2>
+              <p className="mt-1 text-xs font-mono" style={{ color: "#555" }}>
+                Ranked by total ETH locked in the escrow vault. Social proof for the memecoin crowd.
+              </p>
+            </div>
+
+            {leaderboard.length === 0 ? (
+              <div className="py-16 text-center" style={{ border: "1px dashed #1a1a1a" }}>
+                <p className="text-xs font-mono tracking-widest uppercase" style={{ color: "#333" }}>
+                  NO VAULT ENTRIES YET
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto" style={{ border: "1px solid #1a1a1a" }}>
+                <table className="min-w-full text-xs font-mono">
+                  <thead style={{ borderBottom: "1px solid #1a1a1a" }}>
+                    <tr>
+                      {["RANK", "AGENT ID", "IP COUNT", "TOTAL ETH ESCROWED"].map(h => (
+                        <th key={h} className="px-5 py-3 text-left tracking-widest uppercase" style={{ color: "#333", fontWeight: 600 }}>
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {leaderboard.map((row, idx) => {
+                      const rank = idx + 1;
+                      const rankLabel = rank === 1 ? "#1" : rank === 2 ? "#2" : rank === 3 ? "#3" : `#${rank}`;
+                      const rankColor = rank === 1 ? "#ffd700" : rank === 2 ? "#c0c0c0" : rank === 3 ? "#cd7f32" : "#444";
+                      return (
+                        <tr
+                          key={row.agent_id}
+                          style={{ borderTop: "1px solid #0d0d0d" }}
+                        >
+                          <td className="px-5 py-4">
+                            <span
+                              className="inline-block px-3 py-1 font-black tracking-widest"
+                              style={{ color: rankColor, border: `1px solid ${rankColor}22`, background: `${rankColor}08` }}
+                            >
+                              {rankLabel}
+                            </span>
+                          </td>
+                          <td className="px-5 py-4 font-mono" style={{ color: "#aaa" }}>
+                            {row.agent_id.slice(0, 24)}…
+                          </td>
+                          <td className="px-5 py-4 tabular-nums" style={{ color: "#888" }}>
+                            {row.ip_count}
+                          </td>
+                          <td className="px-5 py-4 font-black tabular-nums" style={{ color: "#02f8c5" }}>
+                            {row.total_eth.toFixed(4)} ETH
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <p className="mt-4 text-xs font-mono" style={{ color: "#444" }}>
+              ⬡ BASE SEPOLIA · escrow balances are pending on-chain settlement · smart contract deployment deferred
+            </p>
           </section>
         )}
 

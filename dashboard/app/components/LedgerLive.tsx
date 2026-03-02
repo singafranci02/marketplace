@@ -11,16 +11,20 @@ interface ArtifactRow {
   chain_valid?: boolean;
   verified?: boolean;
   isNew?: boolean;
+  tx_hash?: string;
+  on_chain_status?: string;
   terms?: { price_usd_monthly?: number };
   policy_check?: { decision?: string };
   [key: string]: unknown;
 }
 
 interface LedgerRow {
-  artifact:      Record<string, unknown>;
-  verified:      boolean;
-  artifact_hash: string;
-  prev_hash:     string;
+  artifact:        Record<string, unknown>;
+  verified:        boolean;
+  artifact_hash:   string;
+  prev_hash:       string;
+  tx_hash:         string | null;
+  on_chain_status: string | null;
 }
 
 export function LedgerLive({ initialArtifacts }: { initialArtifacts: ArtifactRow[] }) {
@@ -42,10 +46,12 @@ export function LedgerLive({ initialArtifacts }: { initialArtifacts: ArtifactRow
           const row = payload.new as LedgerRow;
           const newEntry: ArtifactRow = {
             ...(row.artifact as Record<string, unknown>),
-            verified:      row.verified,
-            artifact_hash: row.artifact_hash,
-            chain_valid:   row.prev_hash === lastHashRef.current,
-            isNew:         true,
+            verified:        row.verified,
+            artifact_hash:   row.artifact_hash,
+            chain_valid:     row.prev_hash === lastHashRef.current,
+            tx_hash:         row.tx_hash ?? undefined,
+            on_chain_status: row.on_chain_status ?? "OFF_CHAIN",
+            isNew:           true,
           };
           lastHashRef.current = row.artifact_hash;
           setArtifacts((prev) => [...prev, newEntry]);
@@ -76,6 +82,9 @@ export function LedgerLive({ initialArtifacts }: { initialArtifacts: ArtifactRow
   );
   const approved = artifacts.filter(
     (a) => a.policy_check?.decision === "APPROVED"
+  ).length;
+  const onChainVerified = artifacts.filter(
+    (a) => a.on_chain_status === "VERIFIED_ON_CHAIN"
   ).length;
 
   return (
@@ -117,11 +126,12 @@ export function LedgerLive({ initialArtifacts }: { initialArtifacts: ArtifactRow
       </div>
 
       {/* KPI strip */}
-      <div className="mb-8 grid grid-cols-3 gap-4">
+      <div className="mb-8 grid grid-cols-4 gap-4">
         {[
           { label: "TOTAL DEALS",        value: artifacts.length },
           { label: "POLICY APPROVED",    value: approved },
           { label: "MONTHLY COMMITMENT", value: `$${totalValue.toLocaleString()} USD` },
+          { label: "⛓️ ON-CHAIN VERIFIED", value: onChainVerified },
         ].map(({ label, value }) => (
           <div
             key={label}

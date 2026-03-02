@@ -79,6 +79,41 @@ def _agent_id_to_key_name(agent_id: str) -> str:
         raise ValueError(f"No key mapping for agent: {agent_id}")
     return key
 
+
+# ---------------------------------------------------------------------------
+# Safe Mode — kill-switch enforcement
+# ---------------------------------------------------------------------------
+
+class SafeModeError(Exception):
+    """Raised when the platform kill switch is active. Stops all negotiations."""
+
+
+def _check_kill_switch() -> None:
+    """
+    Checks GET /api/health. If the kill switch is active, raises SafeModeError
+    so the negotiation halts immediately. Network errors are non-fatal (warn + continue).
+    """
+    try:
+        _, api_base = _read_env()
+    except Exception:
+        return  # No env configured — skip check
+
+    url = f"{api_base}/api/health"
+    try:
+        with urllib.request.urlopen(url, timeout=5) as resp:
+            data = json.loads(resp.read())
+            if data.get("kill_switch", {}).get("active"):
+                _log("safe_mode_activated", {"reason": "kill_switch_active", "url": url})
+                raise SafeModeError(
+                    "Platform kill switch is active — entering Safe Mode. "
+                    "All negotiations halted to prevent loss of funds."
+                )
+    except SafeModeError:
+        raise
+    except Exception as e:
+        print(f"  [HEALTH] Warning: health check unreachable ({e}). Continuing.")
+
+
 # ---------------------------------------------------------------------------
 # A2A Message primitives
 # ---------------------------------------------------------------------------
@@ -693,6 +728,9 @@ def run_negotiation() -> DealArtifact:
     buyer  = BuyerAgent(task_id)
     seller = SellerAgent(task_id)
 
+    # ── Kill-switch check #1: before handshake ────────────────────────────────
+    _check_kill_switch()
+
     # ── Authenticated key exchange (ECDHE + Ed25519) ─────────────────────────
     session_key = _perform_handshake(
         buyer_key_name  = "buyer-acmecorp",
@@ -736,6 +774,9 @@ def run_negotiation() -> DealArtifact:
 
     print(f"\n[SYSTEM] {confirmation.payload['message']}")
 
+    # ── Kill-switch check #2: before money-movement step ─────────────────────
+    _check_kill_switch()
+
     # Step 5: Generate and sign the deal artifact
     print(f"\n[SYSTEM] Generating signed deal artifact...")
     artifact = generate_signed_artifact(task_id, buyer, seller, agreed_price, policy)
@@ -755,7 +796,17 @@ def run_negotiation() -> DealArtifact:
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    artifact = run_negotiation()
+    import sys
+    try:
+        artifact = run_negotiation()
+    except SafeModeError as e:
+        print(f"\n{'='*60}")
+        print("  [SAFE MODE] NEGOTIATION HALTED")
+        print(f"{'='*60}")
+        print(f"  {e}")
+        print(f"  No funds were moved. No artifact was signed.")
+        print(f"{'='*60}\n")
+        sys.exit(1)
 
     print(f"\n{'='*60}")
     print("  SIGNED IP LICENSE ARTIFACT")

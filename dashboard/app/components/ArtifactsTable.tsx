@@ -10,6 +10,8 @@ interface DealArtifact {
   chain_valid?: boolean;
   artifact_hash?: string;
   isNew?: boolean;
+  tx_hash?: string;
+  on_chain_status?: string;
   parties: {
     buyer: { agent_id: string; company: string };
     seller: { agent_id: string; company: string; legal_entity_id: string };
@@ -57,7 +59,7 @@ function formatDate(iso: string): string {
 }
 
 const COLS = [
-  "#", "TIMESTAMP (UTC)", "BUYER", "SELLER", "PRODUCT", "SEATS", "PRICE / MO", "POLICY", "STATUS", "SIG", "CHAIN",
+  "#", "TIMESTAMP (UTC)", "BUYER", "SELLER", "PRODUCT", "SEATS", "PRICE / MO", "POLICY", "STATUS", "SIG", "CHAIN", "ON-CHAIN",
 ];
 
 export function ArtifactsTable({ artifacts }: { artifacts: DealArtifact[] }) {
@@ -196,6 +198,26 @@ export function ArtifactsTable({ artifacts }: { artifacts: DealArtifact[] }) {
                   >
                     {a.chain_valid ? "✓ LINKED" : "✗ BROKEN"}
                   </span>
+                )}
+              </td>
+
+              <td className="px-4 py-3 whitespace-nowrap">
+                {a.on_chain_status === "VERIFIED_ON_CHAIN" ? (
+                  <span
+                    className="inline-block px-2 py-0.5 text-xs font-mono"
+                    style={{ color: "#02f8c5", border: "1px solid #02f8c522", background: "#02f8c508" }}
+                  >
+                    ⛓️ VERIFIED
+                  </span>
+                ) : a.on_chain_status === "PENDING_ON_CHAIN" ? (
+                  <span
+                    className="inline-block px-2 py-0.5 text-xs font-mono"
+                    style={{ color: "#f5a623", border: "1px solid #f5a62322", background: "#f5a62308" }}
+                  >
+                    ⏳ PENDING
+                  </span>
+                ) : (
+                  <span className="text-xs font-mono" style={{ color: "#333" }}>—</span>
                 )}
               </td>
             </tr>

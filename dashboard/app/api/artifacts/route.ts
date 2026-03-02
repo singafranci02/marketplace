@@ -3,6 +3,7 @@ import { join } from "path";
 import { verify as cryptoVerify, createHash } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { publicClient } from "@/lib/chain";
 
 const DB_PATH = join(process.cwd(), "..", "database.json");
 
@@ -163,12 +164,30 @@ export async function POST(request: Request) {
     );
   }
 
+  const tx_hash = typeof (artifact as Record<string, unknown>).tx_hash === "string"
+    ? (artifact as Record<string, unknown>).tx_hash as string
+    : undefined;
+
   const agentMap = buildAgentMap();
   const sigValid  = verifyArtifact(artifact, agentMap);
 
   // SHA-256 of the full artifact JSON (sorted keys, compact — includes signatures)
   const artifactJson = JSON.stringify(sortKeysDeep(artifact));
   const artifactHash = createHash("sha256").update(artifactJson).digest("hex");
+
+  // Attempt on-chain receipt verification for Base Sepolia tx_hash (5 s timeout)
+  let on_chain_status = "OFF_CHAIN";
+  if (tx_hash) {
+    try {
+      const receipt = await Promise.race([
+        publicClient.getTransactionReceipt({ hash: tx_hash as `0x${string}` }),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
+      ]);
+      on_chain_status = receipt ? "VERIFIED_ON_CHAIN" : "PENDING_ON_CHAIN";
+    } catch {
+      on_chain_status = "PENDING_ON_CHAIN";
+    }
+  }
 
   const serviceUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -230,11 +249,13 @@ export async function POST(request: Request) {
   const prevHash = lastRow ? lastRow.artifact_hash : "GENESIS";
 
   const { error } = await svc.from("ledger").insert({
-    artifact_id:   artifact.artifact_id ?? `artifact-${Date.now()}`,
+    artifact_id:     artifact.artifact_id ?? `artifact-${Date.now()}`,
     artifact,
-    artifact_hash: artifactHash,
-    prev_hash:     prevHash,
-    verified:      sigValid,
+    artifact_hash:   artifactHash,
+    prev_hash:       prevHash,
+    verified:        sigValid,
+    tx_hash:         tx_hash ?? null,
+    on_chain_status,
   });
 
   if (error) {
@@ -245,7 +266,7 @@ export async function POST(request: Request) {
   }
 
   return Response.json(
-    { artifact_hash: artifactHash, prev_hash: prevHash, verified: sigValid },
+    { artifact_hash: artifactHash, prev_hash: prevHash, verified: sigValid, tx_hash: tx_hash ?? null, on_chain_status },
     { status: 201, headers: { "Access-Control-Allow-Origin": "*" } }
   );
 }
