@@ -6,6 +6,7 @@ import { Hero } from "./components/Hero";
 import { ProcessSteps } from "./components/ProcessSteps";
 import { AgentGrid } from "./components/AgentGrid";
 import { AlphaTicker } from "./components/AlphaTicker";
+import { ReferralLeaderboard } from "./components/ReferralLeaderboard";
 
 const DB_PATH = join(process.cwd(), "..", "database.json");
 
@@ -167,6 +168,9 @@ export default async function HomePage() {
 
       {/* ── Alpha Ticker: live on-chain deals ── */}
       <AlphaTicker />
+
+      {/* ── Referral Leaderboard: top earning referrers ── */}
+      <ReferralLeaderboard />
 
       <section id="vault">
         <AgentGrid agents={annotatedAgents} />

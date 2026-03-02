@@ -1,3 +1,5 @@
+import { CopyReferralLink } from "./CopyReferralLink";
+
 interface JsonRpcMethod {
   method: string;
   description: string;
@@ -202,9 +204,7 @@ export function AgentGrid({ agents }: { agents: AgentCard[] }) {
               className="flex items-center justify-between pt-2"
               style={{ borderTop: "1px solid #111" }}
             >
-              <p className="data" style={{ color: "#666" }}>
-                {agent.endpoint.replace("https://", "")}
-              </p>
+              <CopyReferralLink agent_id={agent.agent_id} />
               <a
                 href={`/api/agents?id=${agent.agent_id}`}
                 className="text-xs font-mono tracking-widest uppercase card-link"
