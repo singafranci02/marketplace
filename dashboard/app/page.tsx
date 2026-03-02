@@ -14,14 +14,27 @@ function getAgents() {
   catch { return []; }
 }
 
-async function getDealCount(): Promise<number> {
+async function getVaultCount(): Promise<number> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return 0;
   const svc = createServiceClient(url, key);
   const { count } = await svc
-    .from("ledger")
-    .select("*", { count: "exact", head: true });
+    .from("ip_vault")
+    .select("*", { count: "exact", head: true })
+    .eq("status", "active");
+  return count ?? 0;
+}
+
+async function getLicenseCount(): Promise<number> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return 0;
+  const svc = createServiceClient(url, key);
+  const { count } = await svc
+    .from("ip_licenses")
+    .select("*", { count: "exact", head: true })
+    .in("status", ["SIGNED", "EXECUTING", "SETTLED"]);
   return count ?? 0;
 }
 
@@ -39,9 +52,10 @@ async function getHeartbeats(): Promise<Record<string, string>> {
 }
 
 export default async function HomePage() {
-  const [agents, dealCount, heartbeats] = await Promise.all([
+  const [agents, vaultCount, licenseCount, heartbeats] = await Promise.all([
     Promise.resolve(getAgents()),
-    getDealCount(),
+    getVaultCount(),
+    getLicenseCount(),
     getHeartbeats(),
   ]);
 
@@ -61,11 +75,11 @@ export default async function HomePage() {
     <>
       <Nav />
 
-      <Hero agentCount={agents.length} dealCount={dealCount} />
+      <Hero vaultCount={vaultCount} licenseCount={licenseCount} />
 
       <ProcessSteps />
 
-      <section id="registry">
+      <section id="vault">
         <AgentGrid agents={annotatedAgents} />
       </section>
 
@@ -98,11 +112,11 @@ export default async function HomePage() {
           style={{ background: "#050505", border: "1px solid #1a1a1a" }}
         >
           {[
-            { method: "GET",  path: "/api/agents",                     desc: "List all verified agents" },
-            { method: "GET",  path: "/api/agents?capability=SaaS",     desc: "Filter by capability" },
-            { method: "GET",  path: "/api/agents?compliance=ISO27001", desc: "Filter by compliance standard" },
-            { method: "GET",  path: "/api/artifacts",                  desc: "All executed deal artifacts (auth required)" },
-            { method: "POST", path: "/api/verify-policy",              desc: "Check a deal against active rules (auth required)" },
+            { method: "GET",  path: "/api/vault",                   desc: "List escrowed IP — filter by type, TVS" },
+            { method: "POST", path: "/api/vault",                   desc: "Escrow new IP (agent Ed25519 sig required)" },
+            { method: "POST", path: "/api/license/{vault_id}",      desc: "Initiate license negotiation" },
+            { method: "GET",  path: "/api/agents",                  desc: "Verified licensor registry" },
+            { method: "POST", path: "/api/verify-policy",           desc: "Policy gate before signing (auth required)" },
           ].map(({ method, path, desc }) => (
             <div key={path} className="flex flex-wrap items-center gap-4">
               <span className="w-10 text-xs font-bold" style={{ color: method === "GET" ? "#02f8c5" : "#f8c502" }}>{method}</span>
@@ -125,9 +139,9 @@ export default async function HomePage() {
         <span>© 2026 AGENTMARKET</span>
         <div className="flex items-center gap-6">
           {[
-            { label: "REGISTRY", href: "/#registry" },
-            { label: "LEDGER",   href: "/ledger" },
-            { label: "DOCS",     href: "/docs" },
+            { label: "VAULT",   href: "/#vault" },
+            { label: "LEDGER",  href: "/ledger" },
+            { label: "DOCS",    href: "/docs" },
           ].map(({ label, href }) => (
             <a key={label} href={href} className="hover:text-white transition-colors duration-150">
               {label}

@@ -1,43 +1,43 @@
 const steps = [
   {
     num: "01",
-    title: "DISCOVERY",
+    title: "ESCROW IP",
     description:
-      "Registry Query: Buyer agent submits a capability or compliance search. The marketplace returns verified seller agents matching all criteria.",
+      "Creator agent POSTs an IPFS hash + license template to the vault API. Ed25519 signature attests ownership. A small ETH deposit is held as skin in the game — proving commitment before any licensee touches the IP.",
+    status: "LIVE",
+    freq: "ON DEPOSIT",
+  },
+  {
+    num: "02",
+    title: "DISCOVER",
+    description:
+      "Licensee agent queries /api/vault filtered by IP type, minimum TVS, or compliance. Returns verified agent cards with IP previews, rev share terms, and license duration — no humans needed to browse.",
     status: "LIVE",
     freq: "ON DEMAND",
   },
   {
-    num: "02",
-    title: "VERIFICATION",
-    description:
-      "Agent Card Validation: The seller's Agent Card is fetched and the Marketplace_Signed certificate is validated. Legal entity ID and Ed25519 public key are confirmed.",
-    status: "LIVE",
-    freq: "PER REQUEST",
-  },
-  {
     num: "03",
-    title: "NEGOTIATION",
+    title: "NEGOTIATE",
     description:
-      "A2A Handshake: Buyer sends a Request for Quote over JSON-RPC. Seller responds with price and terms. Counter-offer flow supported. All messages logged to audit trail.",
+      "A2A JSON-RPC handshake. Licensee proposes term overrides — lower rev share, longer duration, custom performance triggers. Creator counters or accepts. All messages encrypted (AES-256-GCM) and logged to the audit trail.",
     status: "LIVE",
     freq: "ASYNC",
   },
   {
     num: "04",
-    title: "POLICY CHECK",
+    title: "SIGN & ACTIVATE",
     description:
-      "Budget Enforcement: Before committing, the buyer agent calls the internal Policy Engine. If the agreed price exceeds the corporate budget ceiling, the deal is blocked and escalated.",
+      "Dual Ed25519 signatures on the ip_license_contract artifact. Policy gate checks creator rules — e.g. 'no rugs', minimum TVS floor. The signed license is written to the SHA-256 Merkle ledger — tamper-evident and permanent.",
     status: "LIVE",
-    freq: "BLOCKING",
+    freq: "ATOMIC",
   },
   {
     num: "05",
-    title: "EXECUTION",
+    title: "COLLECT",
     description:
-      "Signed Artifact: Both parties sign the final deal with Ed25519 (per-agent private key). The Policy Engine verifies the artifact before signing is allowed. The signed record is written to the Supabase ledger with a SHA-256 chain hash — tamper-evident and permanent.",
+      "Performance triggers auto-adjust terms as outcomes roll in. If the licensed bot generates >10 ETH PNL, rev share bumps to 10% — automatically. Settled rev share is tracked in the Vault Terminal with chain links for on-chain settlements.",
     status: "LIVE",
-    freq: "ATOMIC",
+    freq: "TRIGGERED",
   },
 ];
 

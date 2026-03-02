@@ -1,16 +1,19 @@
 """
-negotiate_deal.py — A2A Protocol Negotiation Engine
+negotiate_deal.py — A2A Protocol IP License Negotiation Engine
 ====================================================
-Simulates a Buyer Agent and Seller Agent negotiating a 10-seat CRM trial
-using the A2A Protocol message format (v0.3).
+Simulates an IP Licensee (Buyer) and IP Licensor (Seller) negotiating
+a crypto IP license using the A2A Protocol message format (v0.3).
+
+IP can be a trading bot, memecoin art, smart contract template, or narrative
+asset stored on IPFS. License terms: rev share %, duration, performance triggers.
 
 Message flow:
-  1. Buyer → Seller : Request for Quote (RFQ)
-  2. Seller → Buyer : Quote response
-  3. Buyer          : check_internal_budget() policy check
-  4. Buyer → Seller : Accept / Counter / Reject
-  5. Seller → Buyer : Final confirmation
-  6. Both           : Sign and emit the deal Artifact
+  1. Licensee → Licensor : Request for License (RFL)
+  2. Licensor → Licensee : License quote (rev share %, duration)
+  3. Licensee            : check_internal_budget() policy check
+  4. Licensee → Licensor : Accept / Counter / Reject
+  5. Licensor → Licensee : Final confirmation
+  6. Both                : Sign ip_license_contract Artifact
 
 Every handshake is appended to negotiation_log.jsonl as an audit trail.
 """
@@ -43,13 +46,21 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 BUYER_AGENT_ID  = "bafybeibuyer0000acmecorp000000000000000000000000000000000001"
 SELLER_AGENT_ID = "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"  # SydneySaaS
 
-BUYER_COMPANY   = "Acme Corp"
-SELLER_COMPANY  = "Sydney SaaS Solutions Pty Ltd"
+BUYER_COMPANY   = "Acme Corp (IP Licensee)"
+SELLER_COMPANY  = "Sydney SaaS Solutions Pty Ltd (IP Licensor)"
 
-# Internal buyer policy: maximum authorised spend for a CRM trial (USD / month)
-BUYER_BUDGET_USD      = 500
-SELLER_ASKING_PRICE   = 420   # Seller's initial quote (per month for 10 seats)
-SELLER_FLOOR_PRICE    = 380   # Minimum the seller will accept
+# IP licensing parameters
+IP_TYPE              = "trading_bot"          # memecoin_art / trading_bot / smart_contract / narrative
+VAULT_IPFS_HASH      = "QmSydneySaasBotV1"    # IPFS hash of the escrowed IP
+LICENSOR_REV_SHARE   = 5                      # Licensor asking rev share %
+LICENSEE_COUNTER_REV = 3                      # Licensee counter-offer
+LICENSOR_FLOOR_REV   = 3                      # Minimum rev share licensor will accept
+LICENSE_DAYS         = 30                     # License duration in days
+
+# Internal buyer policy: maximum authorised rev share %
+BUYER_BUDGET_USD      = 500                   # Still used for USD policy gate
+SELLER_ASKING_PRICE   = LICENSOR_REV_SHARE    # Rev share % (reused in negotiation flow)
+SELLER_FLOOR_PRICE    = LICENSOR_FLOOR_REV    # Floor rev share % (reused in negotiation flow)
 
 AUDIT_LOG_PATH    = Path(__file__).parent / "negotiation_log.jsonl"
 KEYS_DIR          = Path(__file__).parent / "agent-keys"
@@ -95,12 +106,12 @@ class A2AMessage:
 @dataclasses.dataclass
 class DealArtifact:
     """
-    The signed deal artifact — the final contract emitted when negotiation succeeds.
+    The signed IP license artifact — the final contract emitted when negotiation succeeds.
     Both parties include their Ed25519 signature over the canonical artifact body.
     """
     artifact_id:    str
     task_id:        str
-    artifact_type:  str   = "deal_contract"
+    artifact_type:  str   = "ip_license_contract"
     schema_version: str   = "1.0"
     status:         str   = "ACCEPTED"
     parties: dict         = dataclasses.field(default_factory=dict)
@@ -402,32 +413,32 @@ class SellerAgent:
         return dataclasses.replace(msg, payload=payload)
 
     def handle_rfq(self, rfq: A2AMessage) -> A2AMessage:
-        """Receive RFQ and return a quote."""
-        print(f"\n[SELLER] Received RFQ from {rfq.from_agent}")
-        print(f"         Product: {rfq.payload['product']}, "
-              f"Seats: {rfq.payload['seats']}, "
-              f"Trial days: {rfq.payload['trial_days']}")
+        """Receive license request and return a quote with rev share terms."""
+        print(f"\n[LICENSOR] Received license request from {rfq.from_agent}")
+        print(f"           IP type: {rfq.payload.get('ip_type', IP_TYPE)}, "
+              f"Duration: {rfq.payload.get('license_days', LICENSE_DAYS)}d")
 
         quote_price = SELLER_ASKING_PRICE
         response = self._send(
-            method  = "procurement.negotiate_trial",
+            method  = "ip.negotiate_license",
             to      = rfq.from_agent,
             payload = {
-                "quote_id":          str(uuid.uuid4()),
-                "in_reply_to":       rfq.message_id,
-                "product":           rfq.payload["product"],
-                "seats":             rfq.payload["seats"],
-                "trial_days":        rfq.payload["trial_days"],
-                "price_usd_monthly": quote_price,
-                "currency":          "USD",
-                "valid_until":       (
+                "quote_id":      str(uuid.uuid4()),
+                "in_reply_to":   rfq.message_id,
+                "ip_type":       rfq.payload.get("ip_type", IP_TYPE),
+                "ipfs_hash":     rfq.payload.get("ipfs_hash", VAULT_IPFS_HASH),
+                "rev_share_pct": quote_price,
+                "license_days":  rfq.payload.get("license_days", LICENSE_DAYS),
+                "currency":      "USD",
+                "valid_until":   (
                     datetime.datetime.utcnow() + datetime.timedelta(hours=24)
                 ).isoformat() + "Z",
-                "terms": "Trial includes full feature access. Auto-renews at standard rate unless cancelled 7 days prior.",
+                "terms": "License includes full commercial rights. Triggers: >10 ETH PNL → rev share +5%.",
+                # Legacy field for evaluate_quote compatibility
+                "price_usd_monthly": quote_price,
             },
         )
-        print(f"[SELLER] Quote sent: ${quote_price}/month for "
-              f"{rfq.payload['seats']} seats")
+        print(f"[LICENSOR] Quote sent: {quote_price}% rev share · {LICENSE_DAYS}d license")
         return response
 
     def handle_counter(self, counter: A2AMessage) -> A2AMessage:
@@ -503,21 +514,21 @@ class BuyerAgent:
         return dataclasses.replace(msg, payload=payload)
 
     def send_rfq(self, to: str) -> A2AMessage:
-        """Initiate the negotiation with a Request for Quote."""
-        print(f"\n[BUYER] Sending RFQ to {to}")
+        """Initiate the negotiation with a Request for License (RFL)."""
+        print(f"\n[LICENSEE] Sending license request to {to}")
         rfq = self._send(
-            method  = "procurement.evaluate_vendor",
+            method  = "ip.request_license",
             to      = to,
             payload = {
-                "rfq_id":     str(uuid.uuid4()),
-                "product":    "CRM Platform Trial",
-                "seats":      10,
-                "trial_days": 30,
-                "currency":   "USD",
-                "notes":      "Require SSO, data export, and dedicated onboarding support.",
+                "rfl_id":       str(uuid.uuid4()),
+                "ip_type":      IP_TYPE,
+                "ipfs_hash":    VAULT_IPFS_HASH,
+                "license_days": LICENSE_DAYS,
+                "currency":     "USD",
+                "notes":        "Requesting commercial license with performance-linked rev share.",
             },
         )
-        print(f"[BUYER] RFQ sent: 10-seat CRM trial, 30 days")
+        print(f"[LICENSEE] License request sent: {IP_TYPE} · {LICENSE_DAYS}d")
         return rfq
 
     def evaluate_quote(
@@ -604,32 +615,35 @@ def generate_signed_artifact(
     policy_result: dict,
 ) -> DealArtifact:
     """
-    Build and sign the final deal Artifact.
+    Build and sign the IP license Artifact.
     Both parties sign the canonical body with Ed25519 (per-agent private key).
-"""
+    agreed_price is the negotiated rev share %.
+    """
     artifact = DealArtifact(
         artifact_id = f"artifact-{uuid.uuid4()}",
         task_id     = task_id,
         parties = {
-            "buyer": {
+            "licensee": {
                 "agent_id": buyer.agent_id,
                 "company":  buyer.company,
             },
-            "seller": {
+            "licensor": {
                 "agent_id": seller.agent_id,
                 "company":  seller.company,
                 "legal_entity_id": "AU-ABN-51824753556",
             },
         },
         terms = {
-            "product":            "CRM Platform Trial",
-            "seats":              10,
-            "trial_days":         30,
-            "price_usd_monthly":  agreed_price,
-            "currency":           "USD",
-            "start_date":         datetime.datetime.utcnow().date().isoformat(),
-            "auto_renew":         False,
-            "cancellation_notice_days": 7,
+            "ip_type":       IP_TYPE,
+            "ipfs_hash":     VAULT_IPFS_HASH,
+            "rev_share_pct": agreed_price,
+            "license_days":  LICENSE_DAYS,
+            "currency":      "USD",
+            "performance_triggers": [
+                {"pnl_threshold_eth": 10, "new_rev_share_pct": agreed_price + 5}
+            ],
+            "start_date":    datetime.datetime.utcnow().date().isoformat(),
+            "cancellation_notice_days": 3,
         },
         policy_check = policy_result,
     )
@@ -665,15 +679,15 @@ def run_negotiation() -> DealArtifact:
     """
     task_id = f"task-{uuid.uuid4()}"
     print(f"\n{'='*60}")
-    print(f"  A2A NEGOTIATION ENGINE  |  task_id: {task_id[:16]}...")
+    print(f"  A2A IP LICENSE ENGINE   |  task_id: {task_id[:16]}...")
     print(f"{'='*60}")
 
     _log("negotiation_started", {
-        "task_id":  task_id,
-        "buyer":    BUYER_COMPANY,
-        "seller":   SELLER_COMPANY,
-        "product":  "CRM Platform Trial",
-        "seats":    10,
+        "task_id":   task_id,
+        "licensee":  BUYER_COMPANY,
+        "licensor":  SELLER_COMPANY,
+        "ip_type":   IP_TYPE,
+        "ipfs_hash": VAULT_IPFS_HASH,
     })
 
     buyer  = BuyerAgent(task_id)
@@ -744,7 +758,7 @@ if __name__ == "__main__":
     artifact = run_negotiation()
 
     print(f"\n{'='*60}")
-    print("  SIGNED DEAL ARTIFACT")
+    print("  SIGNED IP LICENSE ARTIFACT")
     print(f"{'='*60}")
     print(json.dumps(artifact.to_dict(), indent=2))
 

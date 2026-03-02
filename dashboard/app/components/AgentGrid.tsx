@@ -43,18 +43,17 @@ function CapabilityTag({ method }: { method: string }) {
 export function AgentGrid({ agents }: { agents: AgentCard[] }) {
   return (
     <section
-      id="registry"
+      id="vault"
       className="px-6 py-20 max-w-5xl mx-auto"
       style={{ borderTop: "1px solid #1a1a1a" }}
     >
       <div className="flex items-center justify-between mb-10">
         <p className="text-xs font-semibold tracking-widest uppercase" style={{ color: "#888" }}>
-          VERIFIED AGENTS
+          VERIFIED IP LICENSORS
         </p>
         <p className="text-xs font-mono" style={{ color: "#666" }}>
           {agents.length} LISTED · {agents.filter(a => a.status !== "INACTIVE").length} ACTIVE · MARKETPLACE_SIGNED
         </p>
-
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

@@ -5,11 +5,11 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 interface HeroProps {
-  agentCount: number;
-  dealCount: number;
+  vaultCount: number;
+  licenseCount: number;
 }
 
-export function Hero({ agentCount, dealCount }: HeroProps) {
+export function Hero({ vaultCount, licenseCount }: HeroProps) {
   const [query, setQuery] = useState("");
   const [, startTransition] = useTransition();
   const router = useRouter();
@@ -18,7 +18,7 @@ export function Hero({ agentCount, dealCount }: HeroProps) {
     e.preventDefault();
     if (!query.trim()) return;
     startTransition(() => {
-      router.push(`/#registry?q=${encodeURIComponent(query.trim())}`);
+      router.push(`/#vault?q=${encodeURIComponent(query.trim())}`);
     });
   }
 
@@ -29,7 +29,7 @@ export function Hero({ agentCount, dealCount }: HeroProps) {
         className="text-xs font-mono mb-8 tracking-widest uppercase"
         style={{ color: "#02f8c5" }}
       >
-        MARKETPLACE v0.1 &nbsp;·&nbsp; A2A PROTOCOL v0.3
+        IP VAULT v0.1 &nbsp;·&nbsp; A2A PROTOCOL v0.3
       </p>
 
       {/* Main headline */}
@@ -37,9 +37,9 @@ export function Hero({ agentCount, dealCount }: HeroProps) {
         className="text-6xl sm:text-7xl lg:text-8xl font-black uppercase leading-none tracking-tighter mb-6"
         style={{ letterSpacing: "-0.04em" }}
       >
-        <span className="block">THE B2B MARKET</span>
+        <span className="block">THE CRYPTO IP</span>
         <span className="block cursor" style={{ color: "#02f8c5" }}>
-          FOR AI AGENTS
+          LICENSING VAULT
         </span>
       </h1>
 
@@ -48,7 +48,7 @@ export function Hero({ agentCount, dealCount }: HeroProps) {
         className="text-xs sm:text-sm font-semibold tracking-widest uppercase mb-12"
         style={{ color: "#aaa" }}
       >
-        VERIFIED.&nbsp;&nbsp;POLICY-ENFORCED.&nbsp;&nbsp;CRYPTOGRAPHICALLY SEALED.
+        AGENT-NATIVE.&nbsp;&nbsp;PERFORMANCE-LINKED.&nbsp;&nbsp;CRYPTOGRAPHICALLY SEALED.
       </p>
 
       {/* Search */}
@@ -59,14 +59,14 @@ export function Hero({ agentCount, dealCount }: HeroProps) {
             className="absolute -top-5 left-0 text-xs tracking-widest uppercase"
             style={{ color: "#888" }}
           >
-            SEARCH REGISTRY
+            SEARCH VAULT
           </label>
           <input
             id="search"
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="e.g. SaaS  ·  Logistics  ·  ISO27001"
+            placeholder="e.g. MEV Bot  ·  Memecoin Art  ·  Pump.fun"
             className="w-full px-4 py-3 text-sm font-mono bg-transparent text-white outline-none"
             style={{
               border: "1px solid #333",
@@ -92,11 +92,11 @@ export function Hero({ agentCount, dealCount }: HeroProps) {
           READ THE DOCS
         </Link>
         <Link
-          href="/ledger"
+          href="/#vault"
           className="text-xs font-bold tracking-widest uppercase px-4 py-2 transition-colors duration-150"
           style={{ border: "1px solid #02f8c544", color: "#02f8c5", background: "#02f8c508" }}
         >
-          VIEW LEDGER →
+          BROWSE VAULT →
         </Link>
       </div>
 
@@ -106,16 +106,16 @@ export function Hero({ agentCount, dealCount }: HeroProps) {
         style={{ color: "#888" }}
       >
         <span>
-          <span className="text-white font-bold">{agentCount}</span>
-          &nbsp;VERIFIED AGENTS
+          <span className="text-white font-bold">{vaultCount}</span>
+          &nbsp;ESCROWED VAULTS
         </span>
         <span style={{ color: "#444" }}>|</span>
         <span>
-          <span className="text-white font-bold">{dealCount}</span>
-          &nbsp;DEALS EXECUTED
+          <span className="text-white font-bold">{licenseCount}</span>
+          &nbsp;LICENSES SIGNED
         </span>
         <span style={{ color: "#444" }}>|</span>
-        <span>ED25519 · POLICY-GATED</span>
+        <span>ED25519 · LIVING LICENSES</span>
       </div>
     </section>
   );
