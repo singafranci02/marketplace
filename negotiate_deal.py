@@ -18,6 +18,7 @@ Message flow:
 Every handshake is appended to negotiation_log.jsonl as an audit trail.
 """
 
+import hashlib
 import json
 import os
 import uuid
@@ -680,6 +681,9 @@ def generate_signed_artifact(
             ],
             "start_date":    datetime.datetime.utcnow().date().isoformat(),
             "cancellation_notice_days": 3,
+            # Phase 27: hardware binding — SHA-256 of buyer's MAC address.
+            # Covered by both Ed25519 signatures; validated by license_validator.py.
+            "hardware_id":   hashlib.sha256(str(uuid.getnode()).encode()).hexdigest(),
         },
         policy_check = policy_result,
     )

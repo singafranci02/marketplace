@@ -71,7 +71,7 @@ export async function GET(request: Request) {
   }
 
   // Expiry check
-  const terms     = license.custom_terms as { license_days?: number } | null;
+  const terms     = license.custom_terms as { license_days?: number; hardware_id?: string } | null;
   const licenseDays = terms?.license_days ?? 0;
   let expiresAt: string | null = null;
 
@@ -100,11 +100,12 @@ export async function GET(request: Request) {
 
   return Response.json(
     {
-      valid:       true,
-      license_id:  license.id,
-      status:      license.status,
-      expires_at:  expiresAt,
+      valid:        true,
+      license_id:   license.id,
+      status:       license.status,
+      expires_at:   expiresAt,
       tx_verified,
+      hardware_id:  terms?.hardware_id ?? null,
     },
     { headers: CORS }
   );

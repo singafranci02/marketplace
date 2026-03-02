@@ -1,0 +1,33 @@
+-- Phase 27 — Anti-Resale Hardening: Hardware Binding
+-- Run in the Supabase SQL Editor (https://supabase.com/dashboard)
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- No schema changes required for Phase 27.
+--
+-- hardware_id is stored in the existing ip_licenses.custom_terms JSONB column.
+-- Written by POST /api/artifacts when the submitted artifact contains
+-- terms.hardware_id (set by the buyer's machine during negotiate_deal.py).
+--
+-- Field:
+--   custom_terms.hardware_id  — SHA-256 of buyer's MAC address (hex string)
+--
+-- Enforcement:
+--   1. Client-side (license_validator.py):
+--        check() fetches hardware_id from /api/license/check response and
+--        compares it to _get_hardware_id() (SHA-256 of local MAC address).
+--        Raises SecurityException before any key retrieval if mismatch.
+--
+--   2. Server-side (decrypt-key Layer 5):
+--        GET /api/vault/[id]/decrypt-key checks X-Hardware-ID header against
+--        custom_terms.hardware_id → HTTP 403 on mismatch.
+--        license_validator.py sends this header automatically.
+--
+-- Backward compatibility:
+--   Licenses without custom_terms.hardware_id skip all checks transparently.
+--   Pre-Phase 27 licenses continue to work without modification.
+--
+-- Future upgrade path (NFT token-gating):
+--   Deploy A2ALicenseNFT.sol (ERC-721, soulbound) → chain-listener mints NFT
+--   to locks[taskId].buyer wallet → decrypt-key calls balanceOf() on-chain.
+--   Requires wallet-to-agent-id cryptographic binding to be established first.
+-- ─────────────────────────────────────────────────────────────────────────────

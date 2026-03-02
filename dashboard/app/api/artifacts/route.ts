@@ -258,6 +258,23 @@ export async function POST(request: Request) {
     );
   }
 
+  // Phase 27: persist hardware_id from artifact.terms into the linked license's custom_terms.
+  // Allows decrypt-key to enforce hardware binding without a schema migration.
+  const artifactTerms = (artifact as { terms?: Record<string, unknown> }).terms;
+  if (artifactTerms?.hardware_id && artifact.artifact_id) {
+    const { data: lic } = await svc
+      .from("ip_licenses")
+      .select("id, custom_terms")
+      .eq("artifact_id", artifact.artifact_id)
+      .maybeSingle();
+    if (lic) {
+      await svc
+        .from("ip_licenses")
+        .update({ custom_terms: { ...(lic.custom_terms as Record<string, unknown> ?? {}), hardware_id: artifactTerms.hardware_id } })
+        .eq("id", lic.id);
+    }
+  }
+
   return Response.json(
     { artifact_hash: artifactHash, prev_hash: prevHash, verified: sigValid, tx_hash: tx_hash ?? null, on_chain_status },
     { status: 201, headers: { "Access-Control-Allow-Origin": "*" } }

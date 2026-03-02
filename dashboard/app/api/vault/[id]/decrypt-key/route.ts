@@ -131,7 +131,7 @@ export async function GET(
   }
 
   // ── Layer 1: Expiry gate ─────────────────────────────────────────────────────
-  const terms     = license.custom_terms as { license_days?: number; max_key_downloads_per_day?: number } | null;
+  const terms     = license.custom_terms as { license_days?: number; max_key_downloads_per_day?: number; hardware_id?: string } | null;
   const licenseDays = terms?.license_days ?? 0;
   if (licenseDays > 0 && license.created_at) {
     const expiry = new Date(license.created_at as string);
@@ -223,6 +223,20 @@ export async function GET(
       // VERIFIED_ON_CHAIN → proceed
     }
     // tx_hash is null → off-chain payment → allow
+  }
+
+  // ── Layer 5: Hardware binding gate ───────────────────────────────────────────
+  // If the license carries a hardware_id (set during negotiation by the buyer's machine),
+  // the request must include a matching X-Hardware-ID header. Licenses without a
+  // hardware_id are unaffected — backward compatible with pre-Phase 27 licenses.
+  if (terms?.hardware_id) {
+    const sentHwId = request.headers.get("X-Hardware-ID");
+    if (!sentHwId || sentHwId !== terms.hardware_id) {
+      return Response.json(
+        { error: "Hardware ID mismatch. This license is bound to a specific machine." },
+        { status: 403, headers: CORS }
+      );
+    }
   }
 
   // ── Phase 24: Wrap content key for licensee's eyes only ─────────────────────

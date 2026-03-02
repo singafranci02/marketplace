@@ -30,6 +30,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import sys
+import uuid
 from typing import Optional
 
 try:
@@ -122,6 +123,13 @@ def _pad_b64(s: str) -> str:
     return s + "=" * (-len(s) % 4)
 
 
+def _get_hardware_id() -> str:
+    """Return a stable SHA-256 fingerprint of this machine's MAC address.
+    Matches the value embedded in DealArtifact.terms.hardware_id during negotiation.
+    """
+    return hashlib.sha256(str(uuid.getnode()).encode()).hexdigest()
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # LicenseValidator
 # ─────────────────────────────────────────────────────────────────────────────
@@ -182,10 +190,14 @@ class LicenseValidator:
         print(f"[LicenseValidator] ✓ License valid for vault {vault_id[:8]}… "
               f"(agent: {agent_id[:12]}…)")
 
-    def check(self) -> bool:
+    def check(self, verify_hardware: bool = True) -> bool:
         """
         Check license validity via /api/license/check (no download quota cost).
         Returns True if a valid, non-expired, non-revoked license exists.
+
+        If verify_hardware=True (default) and the license contains a hardware_id,
+        the local machine fingerprint is compared and SecurityException is raised
+        on mismatch — halting execution before any key retrieval attempt.
         """
         try:
             resp = requests.get(
@@ -197,7 +209,17 @@ class LicenseValidator:
             if resp.status_code != 200:
                 return False
             data = resp.json()
+            # Phase 27: hardware binding check
+            if verify_hardware and data.get("hardware_id"):
+                local_hw = _get_hardware_id()
+                if local_hw != data["hardware_id"]:
+                    raise SecurityException(
+                        "[LICENSE DENIED] Hardware ID mismatch — this license is bound "
+                        "to a different machine. Contact the licensor to transfer the license."
+                    )
             return bool(data.get("valid"))
+        except SecurityException:
+            raise
         except Exception as e:
             raise SecurityException(
                 f"[LICENSE CHECK FAILED] Could not reach clearinghouse: {e}"
@@ -213,7 +235,7 @@ class LicenseValidator:
             resp = requests.get(
                 f"{self.api_base}/api/vault/{self.vault_id}/decrypt-key",
                 params  = {"agent_id": self.agent_id},
-                headers = self._headers,
+                headers = {**self._headers, "X-Hardware-ID": _get_hardware_id()},
                 timeout = 15,
             )
         except Exception as e:
