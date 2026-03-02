@@ -27,6 +27,7 @@ interface IpVault {
   created_at: string;
   wallet_address: string | null;
   content_key_encrypted: string | null;
+  trust_tier?: string | null;
   eth_balance?: string | null;
 }
 
@@ -61,6 +62,18 @@ const TYPE_COLOR: Record<string, string> = {
   trading_bot:    "#02f8c5",
   smart_contract: "#a855f7",
   narrative:      "#f87171",
+};
+
+const TRUST_COLOR: Record<string, string> = {
+  UNVERIFIED: "#555",
+  ATTESTED:   "#f8c502",
+  AUDITED:    "#02f8c5",
+};
+
+const TRUST_ICON: Record<string, string> = {
+  UNVERIFIED: "○",
+  ATTESTED:   "◎",
+  AUDITED:    "●",
 };
 
 const STATUS_COLOR: Record<string, string> = {
@@ -303,6 +316,18 @@ export default async function ClearinghousePage({
                           {TYPE_LABEL[vault.ip_type] ?? vault.ip_type.toUpperCase()}
                         </span>
                         <div className="flex items-center gap-2">
+                          {(() => {
+                            const tier = vault.trust_tier ?? "UNVERIFIED";
+                            const tc = TRUST_COLOR[tier] ?? "#555";
+                            return (
+                              <span
+                                className="text-xs font-mono px-2 py-0.5"
+                                style={{ color: tc, border: `1px solid ${tc}33`, background: `${tc}08` }}
+                              >
+                                {TRUST_ICON[tier] ?? "○"} {tier}
+                              </span>
+                            );
+                          })()}
                           {vault.content_key_encrypted && (
                             <span
                               className="text-xs font-mono px-2 py-0.5"

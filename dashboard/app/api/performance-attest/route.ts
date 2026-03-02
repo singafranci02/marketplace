@@ -98,7 +98,7 @@ export async function POST(request: Request) {
   // Load the license — must be SIGNED or EXECUTING and belong to this licensee
   const { data: license, error: licErr } = await svc
     .from("ip_licenses")
-    .select("id, licensee_agent_id, status, custom_terms, performance_triggers")
+    .select("id, vault_id, licensee_agent_id, status, custom_terms, performance_triggers")
     .eq("id", license_id)
     .single();
 
@@ -153,6 +153,16 @@ export async function POST(request: Request) {
 
   if (insertErr) {
     return Response.json({ error: "Failed to store attestation" }, { status: 500, headers: CORS });
+  }
+
+  // Auto-promote vault trust_tier: UNVERIFIED → ATTESTED on first attestation
+  const vaultId = (license as Record<string, unknown>).vault_id as string | null;
+  if (vaultId) {
+    await svc
+      .from("ip_vault")
+      .update({ trust_tier: "ATTESTED" })
+      .eq("id", vaultId)
+      .eq("trust_tier", "UNVERIFIED");
   }
 
   return Response.json(

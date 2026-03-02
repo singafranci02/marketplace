@@ -13,7 +13,7 @@ interface ArtifactRow {
   isNew?: boolean;
   tx_hash?: string;
   on_chain_status?: string;
-  terms?: { price_usd_monthly?: number };
+  terms?: { rev_share_pct?: number };
   policy_check?: { decision?: string };
   [key: string]: unknown;
 }
@@ -76,10 +76,11 @@ export function LedgerLive({ initialArtifacts }: { initialArtifacts: ArtifactRow
   }, []);
 
   // KPIs derived from live state
-  const totalValue = artifacts.reduce(
-    (sum, a) => sum + (a.terms?.price_usd_monthly ?? 0),
+  const totalRevShare = artifacts.reduce(
+    (sum, a) => sum + (a.terms?.rev_share_pct ?? 0),
     0
   );
+  const avgRevShare = artifacts.length > 0 ? totalRevShare / artifacts.length : 0;
   const approved = artifacts.filter(
     (a) => a.policy_check?.decision === "APPROVED"
   ).length;
@@ -130,7 +131,7 @@ export function LedgerLive({ initialArtifacts }: { initialArtifacts: ArtifactRow
         {[
           { label: "TOTAL DEALS",        value: artifacts.length },
           { label: "POLICY APPROVED",    value: approved },
-          { label: "MONTHLY COMMITMENT", value: `$${totalValue.toLocaleString()} USD` },
+          { label: "AVG REV SHARE",       value: `${avgRevShare.toFixed(1)}%` },
           { label: "⛓️ ON-CHAIN VERIFIED", value: onChainVerified },
         ].map(({ label, value }) => (
           <div

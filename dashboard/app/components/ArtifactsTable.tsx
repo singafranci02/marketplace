@@ -1,5 +1,19 @@
 "use client";
 
+const TYPE_COLOR: Record<string, string> = {
+  memecoin_art:   "#f8c502",
+  trading_bot:    "#02f8c5",
+  smart_contract: "#a855f7",
+  narrative:      "#f87171",
+};
+
+const TYPE_LABEL: Record<string, string> = {
+  memecoin_art:   "MEMECOIN ART",
+  trading_bot:    "TRADING BOT",
+  smart_contract: "SMART CONTRACT",
+  narrative:      "NARRATIVE",
+};
+
 interface DealArtifact {
   artifact_id: string;
   task_id: string;
@@ -13,27 +27,25 @@ interface DealArtifact {
   tx_hash?: string;
   on_chain_status?: string;
   parties: {
-    buyer: { agent_id: string; company: string };
-    seller: { agent_id: string; company: string; legal_entity_id: string };
+    licensee: { agent_id: string; company: string; legal_entity_id: string };
+    licensor: { agent_id: string; company: string; legal_entity_id: string };
   };
   terms: {
-    product: string;
-    seats: number;
-    trial_days: number;
-    price_usd_monthly: number;
+    ip_type: string;
+    ipfs_hash: string;
+    rev_share_pct: number;
+    license_days: number;
     currency: string;
+    performance_triggers: { pnl_threshold_eth: number; new_rev_share_pct: number }[];
     start_date: string;
-    auto_renew: boolean;
     cancellation_notice_days: number;
   };
   policy_check: {
     policy_engine_version: string;
     checked_at: string;
-    proposed_price_usd: number;
-    budget_ceiling_usd: number;
-    monthly_per_seat_usd: number;
-    seats: number;
-    trial_days: number;
+    proposed_rev_share_pct: number;
+    rev_share_ceiling_pct: number;
+    license_days: number;
     decision: "APPROVED" | "REJECTED";
     reason: string;
   };
@@ -59,7 +71,7 @@ function formatDate(iso: string): string {
 }
 
 const COLS = [
-  "#", "TIMESTAMP (UTC)", "BUYER", "SELLER", "PRODUCT", "SEATS", "PRICE / MO", "POLICY", "STATUS", "SIG", "CHAIN", "ON-CHAIN",
+  "#", "TIMESTAMP (UTC)", "LICENSOR", "LICENSEE", "IP TYPE", "IPFS", "REV SHARE", "DAYS", "POLICY", "STATUS", "SIG", "CHAIN", "ON-CHAIN",
 ];
 
 export function ArtifactsTable({ artifacts }: { artifacts: DealArtifact[] }) {
@@ -112,54 +124,83 @@ export function ArtifactsTable({ artifacts }: { artifacts: DealArtifact[] }) {
                 {formatDate(a.issued_at)}
               </td>
 
+              {/* LICENSOR */}
               <td className="px-4 py-3 font-semibold text-white">
-                {a.parties.buyer.company}
+                {a.parties?.licensor?.company ?? "—"}
               </td>
 
+              {/* LICENSEE */}
               <td className="px-4 py-3">
-                <div className="font-semibold text-white">{a.parties.seller.company}</div>
-                <div style={{ color: "#333" }}>{a.parties.seller.legal_entity_id}</div>
+                <div className="font-semibold text-white">{a.parties?.licensee?.company ?? "—"}</div>
+                <div style={{ color: "#333" }}>{a.parties?.licensee?.legal_entity_id}</div>
               </td>
 
-              <td className="px-4 py-3" style={{ color: "#888" }}>{a.terms.product}</td>
-
-              <td className="px-4 py-3 tabular-nums" style={{ color: "#666" }}>
-                {a.terms.seats}
+              {/* IP TYPE badge */}
+              <td className="px-4 py-3">
+                {a.terms?.ip_type ? (
+                  <span
+                    className="inline-block px-2 py-0.5 text-xs font-mono"
+                    style={{
+                      color:      TYPE_COLOR[a.terms.ip_type] ?? "#888",
+                      border:     `1px solid ${(TYPE_COLOR[a.terms.ip_type] ?? "#888") + "33"}`,
+                      background: (TYPE_COLOR[a.terms.ip_type] ?? "#888") + "0d",
+                    }}
+                  >
+                    {TYPE_LABEL[a.terms.ip_type] ?? a.terms.ip_type.toUpperCase()}
+                  </span>
+                ) : (
+                  <span style={{ color: "#333" }}>—</span>
+                )}
               </td>
 
+              {/* IPFS hash (truncated) */}
+              <td className="px-4 py-3">
+                <span className="font-mono" style={{ color: "#444" }}>
+                  {a.terms?.ipfs_hash ? a.terms.ipfs_hash.slice(0, 12) + "…" : "—"}
+                </span>
+              </td>
+
+              {/* REV SHARE */}
               <td className="whitespace-nowrap px-4 py-3 font-bold" style={{ color: "#02f8c5" }}>
-                ${a.terms.price_usd_monthly.toLocaleString()} {a.terms.currency}
+                {a.terms?.rev_share_pct !== undefined ? `${a.terms.rev_share_pct}%` : "—"}
               </td>
 
+              {/* DAYS */}
+              <td className="px-4 py-3 tabular-nums" style={{ color: "#666" }}>
+                {a.terms?.license_days ?? "—"}
+              </td>
+
+              {/* POLICY */}
               <td className="px-4 py-3">
                 <span
                   style={{
-                    color: a.policy_check.decision === "APPROVED" ? "#02f8c5" : "#ff4444",
-                    border: `1px solid ${a.policy_check.decision === "APPROVED" ? "#02f8c522" : "#ff444422"}`,
-                    background: a.policy_check.decision === "APPROVED" ? "#02f8c508" : "#ff444408",
+                    color:      a.policy_check?.decision === "APPROVED" ? "#02f8c5" : "#ff4444",
+                    border:     `1px solid ${a.policy_check?.decision === "APPROVED" ? "#02f8c522" : "#ff444422"}`,
+                    background: a.policy_check?.decision === "APPROVED" ? "#02f8c508" : "#ff444408",
                   }}
                   className="inline-block px-2 py-0.5"
                 >
-                  {a.policy_check.decision === "APPROVED" ? "✓ " : "✗ "}
-                  {a.policy_check.decision}
+                  {a.policy_check?.decision === "APPROVED" ? "✓ " : "✗ "}
+                  {a.policy_check?.decision ?? "—"}
                 </span>
-                <div className="mt-0.5" style={{ color: "#333" }}>
-                  ≤${a.policy_check.budget_ceiling_usd}
-                </div>
+                {a.policy_check?.rev_share_ceiling_pct !== undefined && (
+                  <div className="mt-0.5" style={{ color: "#333" }}>
+                    ≤{a.policy_check.rev_share_ceiling_pct}%
+                  </div>
+                )}
               </td>
 
+              {/* STATUS */}
               <td className="px-4 py-3">
                 <span
                   className="inline-block px-2 py-0.5"
-                  style={{
-                    color: "#888",
-                    border: "1px solid #1a1a1a",
-                  }}
+                  style={{ color: "#888", border: "1px solid #1a1a1a" }}
                 >
                   {a.status}
                 </span>
               </td>
 
+              {/* SIG */}
               <td className="px-4 py-3 whitespace-nowrap">
                 {a.verified === undefined ? (
                   <span className="text-xs font-mono" style={{ color: "#333" }}>—</span>
@@ -177,6 +218,7 @@ export function ArtifactsTable({ artifacts }: { artifacts: DealArtifact[] }) {
                 )}
               </td>
 
+              {/* CHAIN */}
               <td className="px-4 py-3 whitespace-nowrap">
                 {a.chain_valid === undefined ? (
                   <span className="text-xs font-mono" style={{ color: "#333" }}>—</span>
@@ -201,6 +243,7 @@ export function ArtifactsTable({ artifacts }: { artifacts: DealArtifact[] }) {
                 )}
               </td>
 
+              {/* ON-CHAIN */}
               <td className="px-4 py-3 whitespace-nowrap">
                 {a.on_chain_status === "VERIFIED_ON_CHAIN" ? (
                   <span
