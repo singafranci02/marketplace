@@ -50,7 +50,7 @@ export async function GET(request: Request) {
   // Find the most recent license (any status) for this vault + agent
   const { data: license, error: licErr } = await svc
     .from("ip_licenses")
-    .select("id, status, created_at, custom_terms")
+    .select("id, status, created_at, custom_terms, artifact_id")
     .eq("vault_id", vault_id)
     .eq("licensee_agent_id", agent_id)
     .not("artifact_id", "is", null)
@@ -84,12 +84,27 @@ export async function GET(request: Request) {
     }
   }
 
+  // Check on-chain payment status (informational — does not gate access here)
+  // null = no blockchain tx (off-chain); true = confirmed; false = pending
+  let tx_verified: boolean | null = null;
+  if (license.artifact_id) {
+    const { data: ledgerEntry } = await svc
+      .from("ledger")
+      .select("tx_hash, on_chain_status")
+      .eq("artifact_id", license.artifact_id)
+      .maybeSingle();
+    if (ledgerEntry?.tx_hash) {
+      tx_verified = ledgerEntry.on_chain_status === "VERIFIED_ON_CHAIN";
+    }
+  }
+
   return Response.json(
     {
-      valid:      true,
-      license_id: license.id,
-      status:     license.status,
-      expires_at: expiresAt,
+      valid:       true,
+      license_id:  license.id,
+      status:      license.status,
+      expires_at:  expiresAt,
+      tx_verified,
     },
     { headers: CORS }
   );

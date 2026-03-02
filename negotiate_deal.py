@@ -156,6 +156,7 @@ class DealArtifact:
     issued_at: str        = dataclasses.field(
         default_factory=lambda: datetime.datetime.utcnow().isoformat() + "Z"
     )
+    tx_hash: str | None   = None  # Base Sepolia tx hash — optional, for on-chain payment proof
 
     def canonical_body(self) -> bytes:
         """Deterministic JSON serialisation for signing (no signatures field)."""

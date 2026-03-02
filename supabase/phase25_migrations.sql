@@ -1,0 +1,30 @@
+-- Phase 25 — Atomic Swap Finality Gate
+-- Run in the Supabase SQL Editor (https://supabase.com/dashboard)
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- No schema changes required for Phase 25.
+--
+-- The ledger table already has the required columns (added in Phase 21):
+--   • tx_hash         TEXT  NULLABLE  — Base Sepolia transaction hash
+--   • on_chain_status TEXT  NOT NULL  — "OFF_CHAIN" | "PENDING_ON_CHAIN" | "VERIFIED_ON_CHAIN"
+--
+-- The ip_licenses table already has:
+--   • artifact_id     TEXT  NULLABLE  — links license to ledger entry
+--
+-- Phase 25 adds no new tables or columns; it only layers new enforcement
+-- logic on top of existing data:
+--
+--   decrypt-key Layer 4 gate:
+--     SELECT tx_hash, on_chain_status FROM ledger WHERE artifact_id = <license.artifact_id>
+--     → VERIFIED_ON_CHAIN → allow key delivery
+--     → PENDING_ON_CHAIN  → live re-verify; allow or HTTP 402
+--     → tx_hash IS NULL   → off-chain payment; allow (backward compatible)
+--
+--   /api/license/check enhancement:
+--     Same ledger query; surfaces tx_verified: true | false | null in response.
+--
+-- Key rotation: already implemented since Phase 24.
+--   generateKeyPairSync('x25519') runs on every decrypt-key request —
+--   no two wrapped keys share an ephemeral key.
+--   Response now includes: ephemeral_key_rotation: "per-request"
+-- ─────────────────────────────────────────────────────────────────────────────

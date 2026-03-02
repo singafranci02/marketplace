@@ -3,7 +3,7 @@ import { join } from "path";
 import { verify as cryptoVerify, createHash } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
-import { publicClient } from "@/lib/chain";
+import { verifyTransaction } from "@/lib/chain";
 
 const DB_PATH = join(process.cwd(), "..", "database.json");
 
@@ -178,15 +178,8 @@ export async function POST(request: Request) {
   // Attempt on-chain receipt verification for Base Sepolia tx_hash (5 s timeout)
   let on_chain_status = "OFF_CHAIN";
   if (tx_hash) {
-    try {
-      const receipt = await Promise.race([
-        publicClient.getTransactionReceipt({ hash: tx_hash as `0x${string}` }),
-        new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
-      ]);
-      on_chain_status = receipt ? "VERIFIED_ON_CHAIN" : "PENDING_ON_CHAIN";
-    } catch {
-      on_chain_status = "PENDING_ON_CHAIN";
-    }
+    const confirmed = await verifyTransaction(tx_hash as `0x${string}`);
+    on_chain_status = confirmed ? "VERIFIED_ON_CHAIN" : "PENDING_ON_CHAIN";
   }
 
   const serviceUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;

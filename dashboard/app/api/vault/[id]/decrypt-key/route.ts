@@ -7,6 +7,7 @@ import {
 } from "crypto";
 import { readFileSync, existsSync } from "fs";
 import { join } from "path";
+import { verifyTransaction } from "@/lib/chain";
 
 const CORS    = { "Access-Control-Allow-Origin": "*" };
 const DB_PATH = join(process.cwd(), "..", "database.json");
@@ -187,6 +188,43 @@ export async function GET(
     );
   }
 
+  // ── Layer 4: On-chain payment finality gate ──────────────────────────────────
+  // If the artifact linked to this license carries a tx_hash, the payment must
+  // be VERIFIED_ON_CHAIN before the wrapped key is delivered. Off-chain payments
+  // (no tx_hash) pass through unchanged — backward compatible.
+  if (license.artifact_id) {
+    const { data: ledgerEntry } = await svc
+      .from("ledger")
+      .select("tx_hash, on_chain_status")
+      .eq("artifact_id", license.artifact_id)
+      .maybeSingle();
+
+    if (ledgerEntry?.tx_hash) {
+      if (ledgerEntry.on_chain_status === "PENDING_ON_CHAIN") {
+        // Attempt live re-verification (5 s window)
+        const confirmed = await verifyTransaction(ledgerEntry.tx_hash as `0x${string}`);
+        if (confirmed) {
+          await svc
+            .from("ledger")
+            .update({ on_chain_status: "VERIFIED_ON_CHAIN" })
+            .eq("artifact_id", license.artifact_id);
+        } else {
+          return Response.json(
+            { error: "Payment transaction not yet confirmed on-chain. Try again in ~30 seconds.", tx_hash: ledgerEntry.tx_hash },
+            { status: 402, headers: CORS }
+          );
+        }
+      } else if (ledgerEntry.on_chain_status !== "VERIFIED_ON_CHAIN") {
+        return Response.json(
+          { error: "Payment transaction submitted but not yet on-chain.", tx_hash: ledgerEntry.tx_hash },
+          { status: 402, headers: CORS }
+        );
+      }
+      // VERIFIED_ON_CHAIN → proceed
+    }
+    // tx_hash is null → off-chain payment → allow
+  }
+
   // ── Phase 24: Wrap content key for licensee's eyes only ─────────────────────
   const edPubRaw = getAgentEdPubRaw(agent_id);
   if (!edPubRaw) {
@@ -246,13 +284,14 @@ export async function GET(
 
   return Response.json(
     {
-      wrapped_key:   wrappedKeyB64,
-      ephemeral_pub: ephPubB64,
-      wrap_iv:       wrapIvB64,
-      wrap_auth_tag: wrapAuthTagB64,
+      wrapped_key:            wrappedKeyB64,
+      ephemeral_pub:          ephPubB64,
+      wrap_iv:                wrapIvB64,
+      wrap_auth_tag:          wrapAuthTagB64,
       vault_id,
-      license_id:    license.id,
-      note:          "Unwrap with your Ed25519 private key using license_validator.py. Do not share.",
+      license_id:             license.id,
+      ephemeral_key_rotation: "per-request",
+      note:                   "Unwrap with your Ed25519 private key using license_validator.py. Do not share.",
     },
     { headers: CORS }
   );
