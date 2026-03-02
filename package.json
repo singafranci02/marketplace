@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "npx tsx registry-server.ts",
+    "listener": "npx tsx --env-file dashboard/.env.local chain-listener.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -13,6 +14,8 @@
   "type": "module",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1",
+    "@supabase/supabase-js": "^2.49.4",
+    "viem": "^2.30.5",
     "zod": "^4.3.6"
   },
   "devDependencies": {

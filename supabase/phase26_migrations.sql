@@ -1,0 +1,43 @@
+-- Phase 26 — DeFi Settlement: On-Chain Listener & Clearinghouse Contract
+-- Run in the Supabase SQL Editor (https://supabase.com/dashboard)
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- No schema changes required for Phase 26.
+--
+-- All on-chain lock metadata is stored in the existing ip_licenses.custom_terms
+-- JSONB column (no ALTER needed). Fields written by chain-listener.ts:
+--   custom_terms.locked_tx          — transactionHash of the lockFunds() call
+--   custom_terms.locked_amount_wei  — ETH locked in wei (as string)
+--   custom_terms.locked_at          — ISO timestamp when FundsLocked was detected
+--   custom_terms.locked_block       — Base Sepolia block number (as string)
+--
+-- The ledger table's existing tx_hash + on_chain_status columns are reused:
+--   ledger.tx_hash         ← lockFunds() transactionHash
+--   ledger.on_chain_status ← "VERIFIED_ON_CHAIN" (set by listener on FundsLocked)
+--
+-- The ip_licenses.status lifecycle is:
+--   DRAFT → SIGNED → EXECUTING (← chain-listener sets this) → SETTLED → REVOKED
+--
+-- ─────────────────────────────────────────────────────────────────────────────
+-- New artifacts for Phase 26:
+--
+--   contracts/A2AClearinghouse.sol
+--     Deploy to Base Sepolia via Remix IDE:
+--       1. Paste the contract → compile with Solidity 0.8.20
+--       2. Deploy to Base Sepolia (Injected Provider — MetaMask)
+--       3. Copy the deployed address
+--       4. Add to dashboard/.env.local:
+--            A2A_CLEARINGHOUSE_ADDRESS=0x<your_deployed_address>
+--
+--   chain-listener.ts  (project root)
+--     Run: npm run listener
+--     (Equivalent to: npx tsx --env-file dashboard/.env.local chain-listener.ts)
+--
+--   taskId convention (must match in contract + listener + negotiate_deal.py):
+--     Python:     import hashlib; task_id = hashlib.sha3_256(artifact_id.encode()).hexdigest()
+--                 NOTE: use keccak256, not sha3_256 — see below.
+--     Python:     from eth_hash.auto import keccak; task_id = keccak(artifact_id.encode()).hex()
+--     TypeScript: keccak256(toBytes(artifact_id))  — viem
+--     Solidity:   keccak256(bytes(artifactId))
+--
+-- ─────────────────────────────────────────────────────────────────────────────
