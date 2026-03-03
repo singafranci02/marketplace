@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_lang::system_program;
 
-declare_id!("PLACEHOLDER_PROGRAM_ID");
+declare_id!("5iJVuXhrxoLMoxTULcBVaaFkrtyVVGTTgPEyFD47AFj");
 
 // ─────────────────────────────────────────────────────────────────────────────
 // A2A Clearinghouse — Solana Anchor Program
@@ -367,7 +367,7 @@ pub struct LockFunds<'info> {
         init,
         payer = buyer,
         space = EscrowAccount::LEN,
-        seeds = [b"escrow", &task_id],
+        seeds = [b"escrow", task_id.as_ref()],
         bump
     )]
     pub escrow: Account<'info, EscrowAccount>,
@@ -387,7 +387,7 @@ pub struct ReleaseFunds<'info> {
 
     #[account(
         mut,
-        seeds = [b"escrow", &task_id],
+        seeds = [b"escrow", task_id.as_ref()],
         bump = escrow.bump,
         has_one = buyer @ ClearinghouseError::UnauthorizedBuyer,
     )]
@@ -402,7 +402,7 @@ pub struct ReclaimFunds<'info> {
 
     #[account(
         mut,
-        seeds = [b"escrow", &task_id],
+        seeds = [b"escrow", task_id.as_ref()],
         bump = escrow.bump,
         has_one = buyer @ ClearinghouseError::UnauthorizedBuyer,
     )]
@@ -418,7 +418,7 @@ pub struct OpenDispute<'info> {
 
     #[account(
         mut,
-        seeds = [b"escrow", &task_id],
+        seeds = [b"escrow", task_id.as_ref()],
         bump = escrow.bump,
         has_one = buyer @ ClearinghouseError::UnauthorizedBuyer,
     )]
@@ -445,7 +445,7 @@ pub struct ResolveDispute<'info> {
 
     #[account(
         mut,
-        seeds = [b"escrow", &task_id],
+        seeds = [b"escrow", task_id.as_ref()],
         bump = escrow.bump,
     )]
     pub escrow: Account<'info, EscrowAccount>,
