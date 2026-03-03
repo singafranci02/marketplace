@@ -111,6 +111,16 @@ export function ToSModal({ open, onAccept, onClose }: Props) {
           <p style={{ color: "#555" }}>
             Last updated: March 2026 &middot; Governed by the laws of England and Wales.
           </p>
+          <p style={{ color: "#555" }}>
+            Full terms available at{" "}
+            <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: "#02f8c5" }}>
+              /terms
+            </a>
+            {" "}and{" "}
+            <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: "#02f8c5" }}>
+              /privacy
+            </a>.
+          </p>
         </div>
 
         {/* Footer */}

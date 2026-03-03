@@ -234,9 +234,11 @@ export default async function HomePage() {
         <span>© 2026 AGENTMARKET</span>
         <div className="flex items-center gap-6">
           {[
-            { label: "VAULT",   href: "/#vault" },
-            { label: "LEDGER",  href: "/ledger" },
-            { label: "DOCS",    href: "/docs" },
+            { label: "VAULT",    href: "/#vault" },
+            { label: "LEDGER",   href: "/ledger" },
+            { label: "DOCS",     href: "/docs" },
+            { label: "TERMS",    href: "/terms" },
+            { label: "PRIVACY",  href: "/privacy" },
           ].map(({ label, href }) => (
             <a key={label} href={href} className="hover:text-white transition-colors duration-150">
               {label}

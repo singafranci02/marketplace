@@ -153,6 +153,13 @@ export default function RegisterPage() {
               SIGN IN
             </Link>
           </p>
+
+          <p className="text-center" style={{ color: "#555", fontSize: "10px", fontFamily: "monospace" }}>
+            By registering you agree to our{" "}
+            <a href="/terms" style={{ color: "#02f8c5" }}>Terms of Service</a>
+            {" "}and{" "}
+            <a href="/privacy" style={{ color: "#02f8c5" }}>Privacy Policy</a>.
+          </p>
         </form>
       </div>
     </div>
