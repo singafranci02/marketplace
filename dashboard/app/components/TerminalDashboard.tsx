@@ -54,6 +54,18 @@ export interface IntentRow {
   created_at:          string;
 }
 
+export interface DisputeRow {
+  id:           string;
+  license_id:   string;
+  artifact_id:  string;
+  task_id:      string;
+  reason:       string;
+  dispute_hash: string;
+  status:       string;       // "OPEN" | "RESOLVED"
+  resolution:   string | null;
+  created_at:   string;
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -62,6 +74,7 @@ function statusColor(s: string): string {
   const u = s.toUpperCase();
   if (u === "VERIFIED_ON_CHAIN" || u === "SETTLED" || u === "ACTIVE") return "#02f8c5";
   if (u === "SIGNED" || u === "EXECUTING") return "#f8c502";
+  if (u === "DISPUTED") return "#f8c502";
   if (u === "REVOKED") return "#f84902";
   return "#555";
 }
@@ -154,17 +167,20 @@ export function TerminalDashboard({
   initialLicenses,
   initialVaults,
   initialIntents,
+  initialDisputes,
 }: {
   initialDeals:    DealRow[];
   agents:          AgentRow[];
   initialLicenses: LicenseRow[];
   initialVaults:   VaultRow[];
   initialIntents:  IntentRow[];
+  initialDisputes: DisputeRow[];
 }) {
   const [deals,    setDeals]    = useState<DealRow[]>(initialDeals);
   const [licenses, setLicenses] = useState<LicenseRow[]>(initialLicenses);
   const [vaults,   setVaults]   = useState<VaultRow[]>(initialVaults);
   const [intents,  setIntents]  = useState<IntentRow[]>(initialIntents);
+  const [disputes, setDisputes] = useState<DisputeRow[]>(initialDisputes);
   const [live,     setLive]     = useState(false);
   const [clock,    setClock]    = useState("");
   const lastHashRef = useRef<string>(initialDeals[0]?.artifact_hash ?? "GENESIS");
@@ -232,13 +248,14 @@ export function TerminalDashboard({
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  // 30s polling — licenses + vaults + intents refresh
+  // 30s polling — licenses + vaults + intents + disputes refresh
   useEffect(() => {
     const poll = async () => {
       try {
-        const [dashRes, intentsRes] = await Promise.all([
+        const [dashRes, intentsRes, disputesRes] = await Promise.all([
           fetch("/api/dashboard"),
           fetch("/api/intents?status=OPEN&limit=10"),
+          fetch("/api/disputes?status=OPEN&limit=10"),
         ]);
         if (dashRes.ok) {
           const data = await dashRes.json();
@@ -248,6 +265,10 @@ export function TerminalDashboard({
         if (intentsRes.ok) {
           const data = await intentsRes.json() as { intents?: IntentRow[] };
           if (data.intents) setIntents(data.intents);
+        }
+        if (disputesRes.ok) {
+          const data = await disputesRes.json() as { disputes?: DisputeRow[] };
+          if (data.disputes) setDisputes(data.disputes);
         }
       } catch { /* ignore */ }
     };
@@ -578,6 +599,72 @@ export function TerminalDashboard({
                   </span>
                   <span style={{ textAlign: "right", color: "#444", fontSize: 9 }}>
                     {fmtDate(intent.created_at)}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Dispute Oracle ── */}
+      <div style={{ marginTop: 1 }}>
+        <div style={PANEL}>
+          <div style={{ ...PANEL_LABEL, justifyContent: "space-between" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              DISPUTE ORACLE
+              <span style={{ color: "#333" }}>——</span>
+              <span style={{ color: disputes.length > 0 ? "#f8c502" : "#444" }}>
+                {disputes.length} OPEN
+              </span>
+            </span>
+            <a
+              href="/api/disputes"
+              target="_blank"
+              style={{ fontSize: 9, color: "#333", textDecoration: "none", letterSpacing: "0.08em" }}
+            >
+              POST /api/disputes →
+            </a>
+          </div>
+          <div style={{ ...TABLE_HEADER, display: "grid", gridTemplateColumns: "72px 110px 120px 1fr 70px 54px", gap: 8 }}>
+            <span>LICENSE</span>
+            <span>ARTIFACT</span>
+            <span>HASH</span>
+            <span>REASON</span>
+            <span style={{ textAlign: "center" }}>STATUS</span>
+            <span style={{ textAlign: "right" }}>FILED</span>
+          </div>
+          <div style={{ overflowY: "auto", maxHeight: 180 }}>
+            {disputes.length === 0 ? (
+              <div style={{ fontSize: 11, color: "#333", padding: "16px 0" }}>
+                No open disputes. Funds auto-release on PASS.
+              </div>
+            ) : (
+              disputes.slice(0, 10).map((d) => (
+                <div
+                  key={d.id}
+                  style={{
+                    ...ROW_BASE,
+                    display:             "grid",
+                    gridTemplateColumns: "72px 110px 120px 1fr 70px 54px",
+                    gap:                 8,
+                  }}
+                >
+                  <span style={{ color: "#555", fontSize: 9 }}>{d.license_id.slice(0, 8)}</span>
+                  <span style={{ color: "#555", fontSize: 9, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {trunc(d.artifact_id, 14)}
+                  </span>
+                  <span style={{ color: "#444", fontSize: 9, fontFamily: "monospace" }}>
+                    {d.dispute_hash.slice(0, 16)}…
+                  </span>
+                  <span style={{ color: "#666", fontSize: 9, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {trunc(d.reason, 48)}
+                  </span>
+                  <span style={{ textAlign: "center", color: d.status === "OPEN" ? "#f8c502" : "#02f8c5", fontSize: 9 }}>
+                    {d.status}
+                  </span>
+                  <span style={{ textAlign: "right", color: "#444", fontSize: 9 }}>
+                    {fmtDate(d.created_at)}
                   </span>
                 </div>
               ))

@@ -423,6 +423,69 @@ async function autoReleaseFunds(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Phase 35 — Dispute Oracle
+// Called from the FAIL branch of handleFundsLocked().
+// Submits open_dispute on-chain and inserts a row into the disputes table.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Build an Anchor `open_dispute` instruction.
+ * Borsh layout: discriminator[8] + task_id[32] + dispute_hash[32]
+ * Accounts: [buyer (signer, writable), escrow PDA (writable)]
+ */
+function buildOpenDisputeIx(
+  taskIdBytes:   Buffer,
+  disputeHash:   Buffer,
+  buyerPubkey:   PublicKey,
+  escrowPda:     PublicKey,
+): TransactionInstruction {
+  const discriminator = createHash("sha256")
+    .update("global:open_dispute")
+    .digest()
+    .slice(0, 8);
+  const data = Buffer.concat([discriminator, taskIdBytes, disputeHash]);
+  return new TransactionInstruction({
+    programId,
+    keys: [
+      { pubkey: buyerPubkey, isSigner: true,  isWritable: true },
+      { pubkey: escrowPda,   isSigner: false, isWritable: true },
+    ],
+    data,
+  });
+}
+
+/**
+ * Submit open_dispute on-chain using PLATFORM_SOLANA_KEYPAIR as buyer-proxy.
+ * Returns the transaction signature or null on error / missing config.
+ */
+async function submitOpenDisputeTx(
+  taskIdHex:       string,
+  disputeHashHex:  string,
+): Promise<string | null> {
+  if (!platformKeypair) {
+    console.warn("  [DISPUTE] PLATFORM_SOLANA_KEYPAIR not set — skipping on-chain open_dispute.");
+    return null;
+  }
+  try {
+    const taskIdBytes    = Buffer.from(taskIdHex, "hex");
+    const disputeHashBuf = Buffer.from(disputeHashHex, "hex");
+    const buyerPubkey    = platformKeypair.publicKey;
+    const [escrowPda]    = PublicKey.findProgramAddressSync(
+      [Buffer.from("escrow"), taskIdBytes],
+      programId,
+    );
+    const ix  = buildOpenDisputeIx(taskIdBytes, disputeHashBuf, buyerPubkey, escrowPda);
+    const tx  = new Transaction().add(ix);
+    const sig = await sendAndConfirmTransaction(connection, tx, [platformKeypair]);
+    console.log(`  [DISPUTE] open_dispute TX: ${sig.slice(0, 12)}…`);
+    return sig;
+  } catch (err) {
+    console.warn(`  [DISPUTE] open_dispute failed: ${err}`);
+    return null;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Event handlers
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -524,6 +587,22 @@ async function handleFundsLocked(
       .update({ status: "DISPUTED", dispute_ends_at: disputeEndsAt })
       .eq("id", lic.id);
     console.log(`  [VERIFY] FAIL → License → DISPUTED. Dispute window ends: ${disputeEndsAt}`);
+
+    // Phase 35: submit open_dispute on-chain + persist to disputes table
+    const disputeReason  = `VerificationScript FAIL: scriptHash=${scriptHash.slice(0, 16)} artifactHash=${artifactHash.slice(0, 16)}`;
+    const disputeHashHex = createHash("sha256").update(disputeReason).digest("hex");
+    const onChainTx      = await submitOpenDisputeTx(event.task_id, disputeHashHex);
+
+    await svc.from("disputes").insert({
+      license_id:   lic.id,
+      artifact_id:  lic.artifact_id,
+      task_id:      event.task_id,
+      reason:       disputeReason,
+      dispute_hash: disputeHashHex,
+      status:       "OPEN",
+      on_chain_tx:  onChainTx,
+    });
+    console.log(`  [DISPUTE] Dispute record created (on_chain_tx: ${onChainTx?.slice(0, 12) ?? "pending"}…)`);
   }
 }
 
@@ -580,6 +659,39 @@ async function handleFundsReclaimed(
   console.log(`  ✓ License → DRAFT — funds reclaimed by buyer (tx: ${signature.slice(0, 12)}…)`);
 }
 
+async function handleDisputeResolved(
+  taskIdHex:       string,
+  releaseToSeller: boolean,
+  adminPubkey:     string,
+  signature:       string,
+): Promise<void> {
+  console.log(`\n[solana-listener] DisputeResolved (task_id: ${taskIdHex.slice(0, 16)}…)`);
+  console.log(`  release_to_seller: ${releaseToSeller}`);
+  console.log(`  admin:             ${adminPubkey}`);
+
+  const resolution = releaseToSeller ? "RELEASE_SELLER" : "REFUND_BUYER";
+  const now        = new Date().toISOString();
+
+  // Update disputes table
+  await svc
+    .from("disputes")
+    .update({ status: "RESOLVED", resolution, resolved_by: adminPubkey, resolved_at: now })
+    .eq("task_id", taskIdHex);
+
+  // Update ip_license status based on admin decision
+  const newLicenseStatus = releaseToSeller ? "SETTLED" : "DRAFT";
+  const lic = await findLicenseByTaskId(taskIdHex);
+  if (lic) {
+    await svc
+      .from("ip_licenses")
+      .update({ status: newLicenseStatus })
+      .eq("id", lic.id);
+    console.log(`  ✓ License → ${newLicenseStatus} (tx: ${signature.slice(0, 12)}…)`);
+  } else {
+    console.warn(`  No license matched task_id ${taskIdHex} for DisputeResolved`);
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Polling loop
 // ─────────────────────────────────────────────────────────────────────────────
@@ -621,6 +733,19 @@ async function poll(lastSignature: string | null): Promise<string | null> {
         await handleFundsReleased(event, sigInfo.signature);
       } else if (event.type === "FundsReclaimed") {
         await handleFundsReclaimed(event, sigInfo.signature);
+      }
+
+      // Phase 35: DisputeResolved is not in ParsedEvent (no amount_lamports) — parse inline
+      const disputeM = log.match(
+        /Program log: DisputeResolved: task_id=([0-9a-f]+) release_to_seller=(true|false) admin=(\S+)/
+      );
+      if (disputeM) {
+        await handleDisputeResolved(
+          disputeM[1],
+          disputeM[2] === "true",
+          disputeM[3],
+          sigInfo.signature,
+        );
       }
     }
   }

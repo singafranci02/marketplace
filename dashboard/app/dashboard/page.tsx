@@ -23,11 +23,12 @@ export default async function DashboardPage() {
   let vaults: Parameters<typeof TerminalDashboard>[0]["initialVaults"] = [];
   let agents: Parameters<typeof TerminalDashboard>[0]["agents"] = [];
   let intents: Parameters<typeof TerminalDashboard>[0]["initialIntents"] = [];
+  let disputes: Parameters<typeof TerminalDashboard>[0]["initialDisputes"] = [];
 
   if (serviceUrl && serviceKey) {
     const svc = createServiceClient(serviceUrl, serviceKey);
 
-    const [ledgerRes, licenseRes, vaultRes, hbRes, liquidityRes, stakeRes, intentsRes] = await Promise.all([
+    const [ledgerRes, licenseRes, vaultRes, hbRes, liquidityRes, stakeRes, intentsRes, disputesRes] = await Promise.all([
       svc
         .from("ledger")
         .select("artifact, amount_lamports, on_chain_status, tx_hash, artifact_hash")
@@ -49,6 +50,12 @@ export default async function DashboardPage() {
       svc
         .from("buyer_intents")
         .select("id, buyer_agent_id, ip_type, max_budget_lamports, description, status, created_at")
+        .eq("status", "OPEN")
+        .order("created_at", { ascending: false })
+        .limit(10),
+      svc
+        .from("disputes")
+        .select("id, license_id, artifact_id, task_id, reason, dispute_hash, status, resolution, created_at")
         .eq("status", "OPEN")
         .order("created_at", { ascending: false })
         .limit(10),
@@ -119,6 +126,18 @@ export default async function DashboardPage() {
       created_at:          (r.created_at as string | null) ?? "",
     }));
 
+    disputes = (disputesRes.data ?? []).map((d) => ({
+      id:           d.id as string,
+      license_id:   (d.license_id as string | null) ?? "",
+      artifact_id:  (d.artifact_id as string | null) ?? "",
+      task_id:      (d.task_id as string | null) ?? "",
+      reason:       (d.reason as string | null) ?? "",
+      dispute_hash: (d.dispute_hash as string | null) ?? "",
+      status:       (d.status as string | null) ?? "OPEN",
+      resolution:   (d.resolution as string | null) ?? null,
+      created_at:   (d.created_at as string | null) ?? "",
+    }));
+
     let allAgents: Record<string, unknown>[] = [];
     if (existsSync(DB_PATH)) {
       try { allAgents = JSON.parse(readFileSync(DB_PATH, "utf-8")).agents ?? []; } catch { /* ignore */ }
@@ -167,6 +186,7 @@ export default async function DashboardPage() {
         initialLicenses={licenses}
         initialVaults={vaults}
         initialIntents={intents}
+        initialDisputes={disputes}
       />
     </>
   );
