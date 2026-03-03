@@ -1,6 +1,10 @@
 # negotiate_deal.py and generate_keys.py require:
 cryptography>=42.0.0
 
+# solana_agent.py — autonomous Solana transaction signing (Phase 32):
+solders>=0.21.0
+solana>=0.35.0
+
 # Future phases (Policy Engine API, A2A HTTP transport):
 # fastapi>=0.115.0
 # uvicorn[standard]>=0.30.0

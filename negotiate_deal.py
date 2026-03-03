@@ -30,6 +30,13 @@ import urllib.error
 from pathlib import Path
 from typing import Literal
 
+# Phase 32: autonomous Solana escrow signing (graceful if solders not installed)
+try:
+    from solana_agent import execute_lock_funds as _execute_lock_funds, SOLDERS_AVAILABLE
+    _SOLANA_ENABLED = SOLDERS_AVAILABLE and bool(os.environ.get("A2A_CLEARINGHOUSE_PROGRAM_ID"))
+except ImportError:
+    _SOLANA_ENABLED = False
+
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
 from cryptography.hazmat.primitives.serialization import (
@@ -734,6 +741,27 @@ def generate_signed_artifact(
 
     _log("artifact_signed", artifact.to_dict())
     _post_artifact(artifact.to_dict())
+
+    # Phase 32: autonomously lock funds on-chain if Anchor program is configured
+    if _SOLANA_ENABLED:
+        try:
+            seller_sol_pubkey = artifact.parties["licensor"].get("solana_pubkey")
+            if seller_sol_pubkey:
+                price_sol = artifact.terms.get("rev_share_pct", 0) / 100  # cents→SOL approximation
+                print(f"\n[SOLANA] Submitting lock_funds for {price_sol:.4f} SOL...")
+                tx_sig = _execute_lock_funds(
+                    buyer_agent_id    = buyer.agent_id,
+                    artifact_id       = artifact.artifact_id,
+                    seller_pubkey_b58 = seller_sol_pubkey,
+                    amount_sol        = price_sol,
+                )
+                artifact.tx_hash = tx_sig
+                _log("lock_funds_submitted", {"artifact_id": artifact.artifact_id, "tx_hash": tx_sig})
+        except Exception as exc:  # noqa: BLE001
+            print(f"\n[SOLANA] lock_funds skipped: {exc}")
+    else:
+        print("\n[SOLANA] Escrow signing disabled (set A2A_CLEARINGHOUSE_PROGRAM_ID to enable)")
+
     return artifact
 
 

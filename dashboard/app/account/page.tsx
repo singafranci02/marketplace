@@ -1,30 +1,20 @@
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { Nav } from "../components/Nav";
 import { ApiKeyManager } from "../components/ApiKeyManager";
+import { SolanaWalletProvider } from "../components/WalletProvider";
+import { AccountPortfolio, type AgentCardData } from "../components/AccountPortfolio";
 import { getSolBalance } from "@/lib/solana";
 
 const ACCENT = "#02f8c5";
 const DIM    = "#555";
-
-const TIER_COLOR: Record<string, string> = {
-  STAKED:     "#f8c502",
-  AUDITED:    "#02f8c5",
-  ATTESTED:   "#888",
-  UNVERIFIED: "#444",
-};
 
 function trustTier(compliance: string[], staked_sol: number, earned_sol: number): string {
   if (staked_sol > 0) return "STAKED";
   if (earned_sol > 0 && (compliance.includes("SOC2-Type2") || compliance.includes("ISO27001"))) return "AUDITED";
   if (compliance.length > 0) return "ATTESTED";
   return "UNVERIFIED";
-}
-
-function shortPubkey(pk: string): string {
-  return pk.length > 12 ? `${pk.slice(0, 4)}…${pk.slice(-4)}` : pk;
 }
 
 export default async function AccountPage() {
@@ -43,21 +33,14 @@ export default async function AccountPage() {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   type AgentRow = {
-    agent_id:     string;
-    name:         string;
+    agent_id:      string;
+    name:          string;
     solana_pubkey: string | null;
-    compliance:   string[];
-    joined_at:    string;
+    compliance:    string[];
+    joined_at:     string;
   };
 
-  type AgentCard = AgentRow & {
-    live_sol:    string;
-    earned_sol:  number;
-    staked_sol:  number;
-    tier:        string;
-  };
-
-  let agentCards: AgentCard[] = [];
+  let agentCards: AgentCardData[] = [];
 
   if (serviceUrl && serviceKey) {
     const svc = createServiceClient(serviceUrl, serviceKey);
@@ -78,10 +61,9 @@ export default async function AccountPage() {
 
     const myAgents = (agentsRes.data ?? []) as AgentRow[];
 
-    // Build lookup maps
     const earnedMap: Record<string, number> = {};
     for (const row of dealsRes.data ?? []) {
-      const art     = row.artifact as { parties?: { licensor?: { agent_id?: string } } };
+      const art      = row.artifact as { parties?: { licensor?: { agent_id?: string } } };
       const sellerId = art?.parties?.licensor?.agent_id;
       if (sellerId && row.amount_lamports) {
         earnedMap[sellerId] = (earnedMap[sellerId] ?? 0) + Number(row.amount_lamports);
@@ -91,17 +73,17 @@ export default async function AccountPage() {
     const stakeMap: Record<string, number> = {};
     for (const row of stakesRes.data ?? []) stakeMap[row.agent_id] = Number(row.lamports_staked);
 
-    // Fetch live SOL balances in parallel
     const balances = await Promise.all(
       myAgents.map((a) => (a.solana_pubkey ? getSolBalance(a.solana_pubkey) : Promise.resolve("0.0000")))
     );
 
-    agentCards = myAgents.map((a, i) => {
+    agentCards = myAgents.map((a, i): AgentCardData => {
       const earned_sol = (earnedMap[a.agent_id] ?? 0) / 1e9;
       const staked_sol = (stakeMap[a.agent_id] ?? 0) / 1e9;
       return {
         ...a,
-        live_sol:   balances[i],
+        compliance:  a.compliance ?? [],
+        live_sol:    balances[i],
         earned_sol,
         staked_sol,
         tier: trustTier(a.compliance ?? [], staked_sol, earned_sol),
@@ -147,114 +129,12 @@ export default async function AccountPage() {
         </p>
 
         {/* ── MY AGENTS / PORTFOLIO ─────────────────────────────────────────── */}
-        <div style={{ marginTop: 48 }}>
-          <p className="text-xs tracking-widest uppercase mb-1" style={{ color: ACCENT }}>
-            MY AGENTS
-          </p>
-          <h2 className="text-xl font-black uppercase tracking-tight mb-6">PORTFOLIO</h2>
-
-          {agentCards.length === 0 ? (
-            <div className="p-5" style={{ border: "1px solid #1a1a1a", background: "#030303" }}>
-              <p className="text-sm" style={{ color: "#888" }}>
-                No agents registered yet.
-              </p>
-              <p className="mt-3 text-xs" style={{ color: DIM }}>
-                Register your first agent to start selling IP:
-              </p>
-              <div className="mt-3 flex gap-4">
-                <Link
-                  href="/sell"
-                  style={{
-                    display:       "inline-block",
-                    fontSize:      11,
-                    fontWeight:    700,
-                    letterSpacing: "0.1em",
-                    textTransform: "uppercase",
-                    color:         ACCENT,
-                    border:        `1px solid ${ACCENT}33`,
-                    padding:       "7px 14px",
-                    textDecoration: "none",
-                  }}
-                >
-                  VIEW ONBOARDING GUIDE →
-                </Link>
-              </div>
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              {agentCards.map((agent) => (
-                <div
-                  key={agent.agent_id}
-                  style={{ border: "1px solid #1a1a1a", background: "#030303", padding: "20px 24px" }}
-                >
-                  {/* Agent name + tier */}
-                  <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 14 }}>
-                    <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-                      <span style={{ color: ACCENT, fontSize: 11 }}>◈</span>
-                      <span style={{ fontSize: 14, fontWeight: 700, color: "#fff", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                        {agent.name}
-                      </span>
-                      <span style={{ fontSize: 10, color: "#555" }}>
-                        {agent.agent_id}
-                      </span>
-                    </div>
-                    <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", color: TIER_COLOR[agent.tier] ?? "#555" }}>
-                      {agent.tier}
-                    </span>
-                  </div>
-
-                  {/* Metrics grid */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px 24px", marginBottom: 14 }}>
-                    {[
-                      ["LIVE BALANCE",    `${agent.live_sol} SOL`],
-                      ["EARNED (SETTLED)", `${agent.earned_sol.toFixed(4)} SOL`],
-                      ["STAKED",          `${agent.staked_sol.toFixed(4)} SOL`],
-                    ].map(([label, value]) => (
-                      <div key={label}>
-                        <div style={{ fontSize: 9, color: DIM, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 2 }}>
-                          {label}
-                        </div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: "#ccc" }}>{value}</div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Wallet row */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <span style={{ fontSize: 9, color: DIM, letterSpacing: "0.1em", textTransform: "uppercase" }}>WALLET</span>
-                    {agent.solana_pubkey ? (
-                      <>
-                        <span style={{ fontSize: 11, color: "#888" }}>
-                          {shortPubkey(agent.solana_pubkey)}
-                        </span>
-                        <a
-                          href={`https://explorer.solana.com/address/${agent.solana_pubkey}?cluster=devnet`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            fontSize:      10,
-                            fontWeight:    700,
-                            letterSpacing: "0.1em",
-                            textTransform: "uppercase",
-                            color:         ACCENT,
-                            textDecoration: "none",
-                          }}
-                        >
-                          VIEW ON EXPLORER →
-                        </a>
-                      </>
-                    ) : (
-                      <span style={{ fontSize: 11, color: DIM }}>—</span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <SolanaWalletProvider>
+          <AccountPortfolio agents={agentCards} />
+        </SolanaWalletProvider>
 
         {/* Footer */}
-        <p className="mt-8 text-xs" style={{ color: "#444" }}>
+        <p className="mt-8 text-xs" style={{ color: DIM }}>
           BALANCES SHOWN FROM SOLANA DEVNET · SETTLEMENT: AES-256 + Ed25519 + SOLANA
         </p>
       </main>
