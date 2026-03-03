@@ -39,6 +39,7 @@ import {
   Keypair,
   SystemProgram,
   Transaction,
+  TransactionInstruction,
   sendAndConfirmTransaction,
   clusterApiUrl,
   LAMPORTS_PER_SOL,
@@ -325,6 +326,103 @@ async function payReferralReward(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Phase 34 — Verification Gate
+// Runs AFTER FundsLocked is detected. Verifies the seller's VerificationScript
+// hash and the artifact hash before auto-releasing escrowed SOL to the seller.
+// In production this would run inside a TEE; for now it's a simulated check.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const VALID_HASH_RE = /^[0-9a-f]{64}$/;
+
+/** Simulated TEE verification: PASS iff both hashes are valid 64-char hex. */
+async function simulateVerification(
+  taskIdHex:       string,
+  artifactHashHex: string,
+  scriptHash:      string,
+  artifactId:      string,
+): Promise<"PASS" | "FAIL"> {
+  const hashesValid =
+    VALID_HASH_RE.test(artifactHashHex) &&
+    VALID_HASH_RE.test(scriptHash);
+  const status: "PASS" | "FAIL" = hashesValid ? "PASS" : "FAIL";
+  const notes = hashesValid
+    ? `artifact_hash=${artifactHashHex.slice(0, 16)}… script_hash=${scriptHash.slice(0, 16)}…`
+    : `Invalid hash format (artifact=${artifactHashHex.length} chars, script=${scriptHash.length} chars)`;
+
+  // Persist result for audit
+  await svc.from("verification_results").insert({
+    artifact_id:   artifactId,
+    task_id:       taskIdHex,
+    status,
+    script_hash:   scriptHash || null,
+    artifact_hash: artifactHashHex || null,
+    notes,
+  });
+  return status;
+}
+
+/**
+ * Build an Anchor `release_funds` instruction.
+ * Borsh layout: discriminator[8] + task_id[32] + artifact_hash_proof[32]
+ * Matches programs/a2a-clearinghouse/src/lib.rs release_funds()
+ */
+function buildReleaseFundsIx(
+  taskIdBytes:       Buffer,
+  sellerPubkey:      PublicKey,
+  escrowPda:         PublicKey,
+  buyerPubkey:       PublicKey,
+  artifactHashProof: Buffer,
+): TransactionInstruction {
+  const discriminator = createHash("sha256")
+    .update("global:release_funds")
+    .digest()
+    .slice(0, 8);
+  const data = Buffer.concat([discriminator, taskIdBytes, artifactHashProof]);
+  return new TransactionInstruction({
+    programId,
+    keys: [
+      { pubkey: buyerPubkey,  isSigner: true,  isWritable: true },
+      { pubkey: sellerPubkey, isSigner: false, isWritable: true },
+      { pubkey: escrowPda,    isSigner: false, isWritable: true },
+    ],
+    data,
+  });
+}
+
+/**
+ * Send the Anchor release_funds instruction using PLATFORM_SOLANA_KEYPAIR as
+ * the buyer-proxy signer. In production the actual buyer would sign via multi-sig.
+ */
+async function autoReleaseFunds(
+  taskIdHex:       string,
+  sellerPubkeyStr: string,
+  artifactHashHex: string,
+): Promise<string | null> {
+  if (!platformKeypair) {
+    console.warn("  [VERIFY] PLATFORM_SOLANA_KEYPAIR not set — cannot auto-release funds.");
+    return null;
+  }
+  try {
+    const taskIdBytes       = Buffer.from(taskIdHex, "hex");
+    const artifactHashBytes = Buffer.from(artifactHashHex, "hex");
+    const sellerPubkey      = new PublicKey(sellerPubkeyStr);
+    const buyerPubkey       = platformKeypair.publicKey;
+    const [escrowPda]       = PublicKey.findProgramAddressSync(
+      [Buffer.from("escrow"), taskIdBytes],
+      programId,
+    );
+    const ix  = buildReleaseFundsIx(taskIdBytes, sellerPubkey, escrowPda, buyerPubkey, artifactHashBytes);
+    const tx  = new Transaction().add(ix);
+    const sig = await sendAndConfirmTransaction(connection, tx, [platformKeypair]);
+    console.log(`  [VERIFY] autoReleaseFunds TX: ${sig.slice(0, 12)}…`);
+    return sig;
+  } catch (err) {
+    console.warn(`  [VERIFY] autoReleaseFunds failed: ${err}`);
+    return null;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Event handlers
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -382,6 +480,51 @@ async function handleFundsLocked(
 
   // Mint cNFT to buyer
   await mintLicenseNft(event.actor, lic.vault_id, lic.id);
+
+  // ── Phase 34: Verification Gate ──────────────────────────────────────────
+  // Fetch the artifact from the ledger to read verification_script_hash and artifact_hash
+  const { data: ledgerRow } = await svc
+    .from("ledger")
+    .select("artifact, artifact_hash")
+    .eq("artifact_id", lic.artifact_id)
+    .maybeSingle();
+
+  const artifact       = (ledgerRow?.artifact as Record<string, unknown> | null) ?? null;
+  const terms          = (artifact?.terms    as Record<string, unknown> | null) ?? {};
+  const parties        = (artifact?.parties  as Record<string, unknown> | null) ?? {};
+  const licensor       = (parties.licensor   as Record<string, unknown> | null) ?? {};
+  const scriptHash     = (terms.verification_script_hash as string | null) ?? "";
+  const artifactHash   = (ledgerRow?.artifact_hash       as string | null) ?? "";
+  const sellerSolPub   = (licensor.solana_pubkey         as string | null) ?? "";
+
+  console.log(`\n  [VERIFY] Running verification gate…`);
+  console.log(`  [VERIFY] script_hash  = ${scriptHash.slice(0, 20) || "(none)"}`);
+  console.log(`  [VERIFY] artifact_hash= ${artifactHash.slice(0, 20) || "(none)"}`);
+
+  const verifyStatus = await simulateVerification(
+    event.task_id,
+    artifactHash,
+    scriptHash,
+    lic.artifact_id,
+  );
+  console.log(`  [VERIFY] Result: ${verifyStatus}`);
+
+  if (verifyStatus === "PASS") {
+    if (sellerSolPub && artifactHash) {
+      console.log(`  [VERIFY] PASS → submitting autoReleaseFunds…`);
+      await autoReleaseFunds(event.task_id, sellerSolPub, artifactHash);
+    } else {
+      console.warn("  [VERIFY] PASS but seller solana_pubkey or artifact_hash missing — manual release required.");
+    }
+  } else {
+    // Enter 24-hour dispute period — SOL remains locked in escrow
+    const disputeEndsAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    await svc
+      .from("ip_licenses")
+      .update({ status: "DISPUTED", dispute_ends_at: disputeEndsAt })
+      .eq("id", lic.id);
+    console.log(`  [VERIFY] FAIL → License → DISPUTED. Dispute window ends: ${disputeEndsAt}`);
+  }
 }
 
 async function handleFundsReleased(

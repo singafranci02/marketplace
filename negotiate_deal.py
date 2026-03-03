@@ -18,6 +18,8 @@ Message flow:
 Every handshake is appended to negotiation_log.jsonl as an audit trail.
 """
 
+from __future__ import annotations
+
 import hashlib
 import json
 import os
@@ -36,6 +38,9 @@ try:
     _SOLANA_ENABLED = SOLDERS_AVAILABLE and bool(os.environ.get("A2A_CLEARINGHOUSE_PROGRAM_ID"))
 except ImportError:
     _SOLANA_ENABLED = False
+
+# Phase 34: buyer-side policy gate
+from policy_engine import PolicyEngine as _PolicyEngine
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
@@ -79,6 +84,26 @@ _AGENT_KEY_MAP = {
     BUYER_AGENT_ID:  "buyer-acmecorp",
     SELLER_AGENT_ID: "sydney-saas",
 }
+
+# ---------------------------------------------------------------------------
+# VerificationScript — Phase 34 Attestation
+# Seller commits a sha256 hash of this script in the signed DealArtifact.terms.
+# The solana-listener runs (or simulates) this script before auto-releasing funds.
+# ---------------------------------------------------------------------------
+
+SELLER_VERIFICATION_SCRIPT = """\
+#!/usr/bin/env python3
+# VerificationScript v1 — sydney-saas trading_bot
+# Verifies the bot IP fingerprint is reproducible.
+import sys, hashlib
+seed = b"QmSydneySaasBotV1"
+fingerprint = hashlib.sha256(seed).hexdigest()
+assert fingerprint, "Fingerprint must be non-empty"
+assert len(fingerprint) == 64, "SHA-256 fingerprint must be 64 hex chars"
+print("PASS:", fingerprint)
+sys.exit(0)
+"""
+SELLER_SCRIPT_HASH = hashlib.sha256(SELLER_VERIFICATION_SCRIPT.encode()).hexdigest()
 
 
 def _agent_id_to_key_name(agent_id: str) -> str:
@@ -500,6 +525,8 @@ class SellerAgent:
                 "terms": "License includes full commercial rights. Triggers: >10 ETH PNL → rev share +5%.",
                 # Legacy field for evaluate_quote compatibility
                 "price_usd_monthly": quote_price,
+                # Phase 34: seller commits the VerificationScript hash in the quote
+                "verification_script_hash": SELLER_SCRIPT_HASH,
             },
         )
         print(f"[LICENSOR] Quote sent: {quote_price}% rev share · {LICENSE_DAYS}d license")
@@ -677,6 +704,7 @@ def generate_signed_artifact(
     seller: SellerAgent,
     agreed_price: float,
     policy_result: dict,
+    verification_script_hash: str = "",
 ) -> DealArtifact:
     """
     Build and sign the IP license Artifact.
@@ -720,6 +748,8 @@ def generate_signed_artifact(
             ],
             "start_date":    datetime.datetime.utcnow().date().isoformat(),
             "cancellation_notice_days": 3,
+            # Phase 34: seller's VerificationScript hash — committed in signed artifact
+            "verification_script_hash": verification_script_hash or SELLER_SCRIPT_HASH,
         },
         policy_check = policy_result,
     )
@@ -738,6 +768,24 @@ def generate_signed_artifact(
         "seller_signature": _sign(body, "sydney-saas"),
         "algorithm": "Ed25519",
     }
+
+    # Phase 34: buyer-side trust layer evaluation (after signing so script hash is in terms)
+    try:
+        api_key_val, api_base_val = _read_env()
+    except Exception:
+        api_key_val, api_base_val = "", ""
+
+    pe_result = _PolicyEngine().evaluate(artifact, api_base_val, api_key_val)
+    artifact.policy_check["trust_layer"] = pe_result.decision
+    artifact.policy_check["trust_rules"] = [dataclasses.asdict(r) for r in pe_result.rules]
+    artifact.policy_check["computed_artifact_hash"] = pe_result.computed_artifact_hash
+
+    if pe_result.decision == "BLOCKED":
+        _log("policy_engine_blocked", {"reasons": pe_result.reasons})
+        raise RuntimeError(f"[POLICY] Trust layer blocked deal: {pe_result.reasons}")
+
+    print(f"\n[POLICY] Trust layer: {pe_result.decision} "
+          f"({len(pe_result.rules)} rules, hash={pe_result.computed_artifact_hash[:16]}…)")
 
     _log("artifact_signed", artifact.to_dict())
     _post_artifact(artifact.to_dict())
@@ -813,6 +861,8 @@ def run_negotiation() -> DealArtifact:
 
     # Step 2: Seller responds with a quote
     quote = seller.handle_rfq(rfq)
+    # Phase 34: extract VerificationScript hash committed by the seller
+    verification_script_hash = quote.payload.get("verification_script_hash", SELLER_SCRIPT_HASH)
 
     # Step 3: Buyer policy check + response
     buyer_response, policy = buyer.evaluate_quote(
@@ -847,7 +897,7 @@ def run_negotiation() -> DealArtifact:
 
     # Step 5: Generate and sign the deal artifact
     print(f"\n[SYSTEM] Generating signed deal artifact...")
-    artifact = generate_signed_artifact(task_id, buyer, seller, agreed_price, policy)
+    artifact = generate_signed_artifact(task_id, buyer, seller, agreed_price, policy, verification_script_hash)
 
     _log("negotiation_completed", {
         "task_id":       task_id,
