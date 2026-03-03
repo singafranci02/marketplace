@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_lang::system_program;
 
-declare_id!("5iJVuXhrxoLMoxTULcBVaaFkrtyVVGTTgPEyFD47AFj");
+declare_id!("DiL4BkxN8sbfzg62JvvxJbUbM3JYa9Y1MoeLpd8oV9gi");
 
 // ─────────────────────────────────────────────────────────────────────────────
 // A2A Clearinghouse — Solana Anchor Program
