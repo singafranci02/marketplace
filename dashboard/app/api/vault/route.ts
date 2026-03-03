@@ -9,16 +9,26 @@ const DB_PATH = join(process.cwd(), "..", "database.json");
 const CORS = { "Access-Control-Allow-Origin": "*" };
 const VALID_TYPES = ["memecoin_art", "trading_bot", "smart_contract", "narrative"] as const;
 
-function getVerifiedAgentIds(): Set<string> {
-  if (!existsSync(DB_PATH)) return new Set();
-  try {
-    const db = JSON.parse(readFileSync(DB_PATH, "utf-8"));
-    return new Set(
-      (db.agents ?? [])
-        .filter((a: { verified: boolean }) => a.verified)
-        .map((a: { agent_id: string }) => a.agent_id)
-    );
-  } catch { return new Set(); }
+async function getVerifiedAgentIds(): Promise<Set<string>> {
+  const ids = new Set<string>();
+  // Source 1: database.json (pre-approved seed agents)
+  if (existsSync(DB_PATH)) {
+    try {
+      const db = JSON.parse(readFileSync(DB_PATH, "utf-8"));
+      for (const a of (db.agents ?? []).filter((a: { verified: boolean }) => a.verified)) {
+        ids.add((a as { agent_id: string }).agent_id);
+      }
+    } catch { /* ignore */ }
+  }
+  // Source 2: self-registered agents in Supabase
+  const serviceUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (serviceUrl && serviceKey) {
+    const reg = createServiceClient(serviceUrl, serviceKey);
+    const { data } = await reg.from("registered_agents").select("agent_id").eq("status", "active");
+    for (const row of (data ?? []) as { agent_id: string }[]) ids.add(row.agent_id);
+  }
+  return ids;
 }
 
 // ---------------------------------------------------------------------------
@@ -109,17 +119,19 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!getVerifiedAgentIds().has(agent_id)) {
-    return Response.json(
-      { error: "agent_id not found in verified registry" },
-      { status: 400, headers: CORS }
-    );
-  }
-
   const serviceUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!serviceUrl || !serviceKey) {
     return Response.json({ error: "Server misconfigured" }, { status: 500, headers: CORS });
+  }
+
+  const svc = createServiceClient(serviceUrl, serviceKey);
+
+  if (!(await getVerifiedAgentIds()).has(agent_id)) {
+    return Response.json(
+      { error: "agent_id not found in verified registry. Register your agent first: POST /api/agents/register" },
+      { status: 400, headers: CORS }
+    );
   }
 
   // Generate AES-256 content key for this vault entry (licensor encrypts their IPFS file with this)
@@ -136,7 +148,6 @@ export async function POST(request: Request) {
     contentKeyEncrypted = [iv.toString("base64"), authTag.toString("base64"), encrypted.toString("base64")].join(":");
   }
 
-  const svc = createServiceClient(serviceUrl, serviceKey);
   const { data, error } = await svc
     .from("ip_vault")
     .insert({

@@ -31,6 +31,36 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  // Merge self-registered agents from Supabase (if service client available)
+  const regUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const regKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (regUrl && regKey) {
+    const regSvc = createServiceClient(regUrl, regKey);
+    const { data: regData } = await regSvc
+      .from("registered_agents")
+      .select("*")
+      .eq("status", "active");
+    for (const r of regData ?? []) {
+      if (!allAgents.find((a) => a["agent_id"] === r.agent_id)) {
+        allAgents.push({
+          agent_id:        r.agent_id,
+          name:            r.name,
+          owner:           r.owner,
+          legal_entity_id: r.legal_entity_id ?? "",
+          public_key:      r.public_key ?? null,
+          endpoint:        r.endpoint ?? "",
+          policy_endpoint: r.policy_endpoint ?? "",
+          compliance:      r.compliance ?? [],
+          capabilities:    r.capabilities ?? [],
+          description:     r.description ?? "",
+          solana_pubkey:   r.solana_pubkey ?? null,
+          verified:        true,
+          joined_at:       r.joined_at,
+        });
+      }
+    }
+  }
+
   const { searchParams } = req.nextUrl;
   const capability = searchParams.get("capability")?.toLowerCase();
   const compliance = searchParams.get("compliance")?.toLowerCase();
