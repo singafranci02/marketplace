@@ -44,6 +44,16 @@ export interface VaultRow {
   status:   string;
 }
 
+export interface IntentRow {
+  id:                  string;
+  buyer_agent_id:      string;
+  ip_type:             string | null;
+  max_budget_lamports: number;
+  description:         string | null;
+  status:              string;
+  created_at:          string;
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -82,6 +92,10 @@ function fmtTime(iso: string | null): string {
   return new Date(iso).toLocaleTimeString("en-US", {
     hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit",
   });
+}
+
+function fmtBudget(lamports: number): string {
+  return (lamports / 1e9).toFixed(3) + " SOL";
 }
 
 function fmtDate(iso: string): string {
@@ -139,15 +153,18 @@ export function TerminalDashboard({
   agents,
   initialLicenses,
   initialVaults,
+  initialIntents,
 }: {
   initialDeals:    DealRow[];
   agents:          AgentRow[];
   initialLicenses: LicenseRow[];
   initialVaults:   VaultRow[];
+  initialIntents:  IntentRow[];
 }) {
   const [deals,    setDeals]    = useState<DealRow[]>(initialDeals);
   const [licenses, setLicenses] = useState<LicenseRow[]>(initialLicenses);
   const [vaults,   setVaults]   = useState<VaultRow[]>(initialVaults);
+  const [intents,  setIntents]  = useState<IntentRow[]>(initialIntents);
   const [live,     setLive]     = useState(false);
   const [clock,    setClock]    = useState("");
   const lastHashRef = useRef<string>(initialDeals[0]?.artifact_hash ?? "GENESIS");
@@ -215,15 +232,23 @@ export function TerminalDashboard({
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  // 30s polling — licenses + vaults refresh
+  // 30s polling — licenses + vaults + intents refresh
   useEffect(() => {
     const poll = async () => {
       try {
-        const res  = await fetch("/api/dashboard");
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data.licenses) setLicenses(data.licenses);
-        if (data.vaults)   setVaults(data.vaults);
+        const [dashRes, intentsRes] = await Promise.all([
+          fetch("/api/dashboard"),
+          fetch("/api/intents?status=OPEN&limit=10"),
+        ]);
+        if (dashRes.ok) {
+          const data = await dashRes.json();
+          if (data.licenses) setLicenses(data.licenses);
+          if (data.vaults)   setVaults(data.vaults);
+        }
+        if (intentsRes.ok) {
+          const data = await intentsRes.json() as { intents?: IntentRow[] };
+          if (data.intents) setIntents(data.intents);
+        }
       } catch { /* ignore */ }
     };
     const id = setInterval(poll, 30_000);
@@ -491,6 +516,68 @@ export function TerminalDashboard({
                   </span>
                   <span style={{ textAlign: "right", color: statusColor(v.status), fontSize: 9 }}>
                     {v.status.toUpperCase()}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Intent Bulletin Board ── */}
+      <div style={{ marginTop: 1 }}>
+        <div style={PANEL}>
+          <div style={{ ...PANEL_LABEL, justifyContent: "space-between" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              INTENT BULLETIN BOARD
+              <span style={{ color: "#333" }}>——</span>
+              <span style={{ color: "#444" }}>{intents.length} OPEN</span>
+            </span>
+            <a
+              href="/api/intents"
+              target="_blank"
+              style={{ fontSize: 9, color: "#333", textDecoration: "none", letterSpacing: "0.08em" }}
+            >
+              POST /api/intents →
+            </a>
+          </div>
+          <div style={{ ...TABLE_HEADER, display: "grid", gridTemplateColumns: "140px 90px 90px 1fr 60px", gap: 8 }}>
+            <span>BUYER</span>
+            <span>IP TYPE</span>
+            <span style={{ textAlign: "right" }}>MAX BUDGET</span>
+            <span>DESCRIPTION</span>
+            <span style={{ textAlign: "right" }}>POSTED</span>
+          </div>
+          <div style={{ overflowY: "auto", maxHeight: 200 }}>
+            {intents.length === 0 ? (
+              <div style={{ fontSize: 11, color: "#333", padding: "16px 0" }}>
+                No open buying intents. POST to /api/intents to create one.
+              </div>
+            ) : (
+              intents.slice(0, 10).map((intent) => (
+                <div
+                  key={intent.id}
+                  style={{
+                    ...ROW_BASE,
+                    display:             "grid",
+                    gridTemplateColumns: "140px 90px 90px 1fr 60px",
+                    gap:                 8,
+                  }}
+                >
+                  <span style={{ color: "#ccc", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {trunc(intent.buyer_agent_id, 16)}
+                  </span>
+                  <span style={{ color: typeColor(intent.ip_type ?? ""), fontSize: 9, letterSpacing: "0.04em" }}>
+                    {intent.ip_type ? intent.ip_type.toUpperCase().replace(/_/g, " ") : "ANY"}
+                  </span>
+                  <span style={{ color: "#02f8c5", textAlign: "right" }}>
+                    {fmtBudget(intent.max_budget_lamports)}
+                  </span>
+                  <span style={{ color: "#666", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 9 }}>
+                    {intent.description ? trunc(intent.description, 52) : "—"}
+                  </span>
+                  <span style={{ textAlign: "right", color: "#444", fontSize: 9 }}>
+                    {fmtDate(intent.created_at)}
                   </span>
                 </div>
               ))

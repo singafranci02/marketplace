@@ -128,7 +128,28 @@ def _build_lock_funds_instruction(
 
 
 # ---------------------------------------------------------------------------
-# Main entry point
+# Shared helper
+# ---------------------------------------------------------------------------
+
+def _submit_instruction(
+    instruction: "Instruction",
+    signer: "Keypair",
+    rpc_url: str,
+) -> str:
+    """Fetch blockhash, build and sign transaction, submit. Returns tx signature."""
+    client           = Client(rpc_url)
+    blockhash_resp   = client.get_latest_blockhash()
+    recent_blockhash = Hash.from_string(str(blockhash_resp.value.blockhash))
+    msg = Message.new_with_blockhash([instruction], signer.pubkey(), recent_blockhash)
+    tx  = Transaction([signer], msg, recent_blockhash)
+    resp = client.send_transaction(tx)
+    if resp.value is None:
+        raise RuntimeError(f"Transaction failed: {resp}")
+    return str(resp.value)
+
+
+# ---------------------------------------------------------------------------
+# lock_funds — legacy (no artifact hash)
 # ---------------------------------------------------------------------------
 
 def execute_lock_funds(
@@ -173,46 +194,94 @@ def execute_lock_funds(
             "Deploy the Anchor program first: anchor build && anchor deploy --provider.cluster devnet"
         )
 
-    # Load buyer keypair
-    buyer_kp = _load_solana_keypair(buyer_agent_id)
-    buyer_pk = buyer_kp.pubkey()
-
-    # Compute task_id (must match Anchor PDA seed and solana_task_id in the artifact)
+    buyer_kp      = _load_solana_keypair(buyer_agent_id)
     task_id_bytes = bytes.fromhex(hashlib.sha256(artifact_id.encode()).hexdigest())
+    program_id    = Pubkey.from_string(program_id_b58)
+    seller_pubkey = Pubkey.from_string(seller_pubkey_b58)
+    amount_lamps  = int(amount_sol * 1_000_000_000)
 
-    program_id     = Pubkey.from_string(program_id_b58)
-    seller_pubkey  = Pubkey.from_string(seller_pubkey_b58)
-    amount_lamps   = int(amount_sol * 1_000_000_000)
-
-    # Build instruction
     instruction = _build_lock_funds_instruction(
-        buyer_pubkey     = buyer_pk,
-        program_id       = program_id,
-        task_id_bytes    = task_id_bytes,
-        seller_pubkey    = seller_pubkey,
-        amount_lamports  = amount_lamps,
+        buyer_pubkey    = buyer_kp.pubkey(),
+        program_id      = program_id,
+        task_id_bytes   = task_id_bytes,
+        seller_pubkey   = seller_pubkey,
+        amount_lamports = amount_lamps,
     )
 
-    # Fetch recent blockhash
-    client        = Client(rpc_url)
-    blockhash_resp = client.get_latest_blockhash()
-    recent_blockhash = Hash.from_string(str(blockhash_resp.value.blockhash))
-
-    # Build and sign transaction
-    msg = Message.new_with_blockhash(
-        [instruction],
-        buyer_pk,
-        recent_blockhash,
-    )
-    tx = Transaction([buyer_kp], msg, recent_blockhash)
-
-    # Submit
-    resp = client.send_transaction(tx)
-    if resp.value is None:
-        raise RuntimeError(f"Transaction failed: {resp}")
-
-    sig = str(resp.value)
+    sig = _submit_instruction(instruction, buyer_kp, rpc_url)
     print(f"  [SOLANA] lock_funds submitted: {sig}")
+    print(f"  [SOLANA] Explorer: https://explorer.solana.com/tx/{sig}?cluster=devnet")
+    return sig
+
+
+# ---------------------------------------------------------------------------
+# lock_and_commit — Phase 33: atomic escrow + artifact hash commitment
+# ---------------------------------------------------------------------------
+
+def execute_lock_and_commit(
+    buyer_agent_id: str,
+    artifact_id: str,
+    artifact_hash_hex: str,
+    seller_pubkey_b58: str,
+    amount_sol: float,
+    rpc_url: Optional[str] = None,
+    program_id_b58: Optional[str] = None,
+) -> str:
+    """
+    Phase 33: Lock SOL AND commit the artifact hash atomically.
+
+    artifact_hash_hex: hex-encoded sha256 of DealArtifact.canonical_body()
+    computed AFTER both Ed25519 signatures are applied.
+
+    The Anchor program's release_funds() will verify this hash before releasing
+    SOL — prevents counterparty from altering deal terms after locking.
+
+    Instruction layout (Borsh):
+      [0:8]    Anchor discriminator = sha256("global:lock_and_commit")[:8]
+      [8:40]   task_id              (32 bytes)
+      [40:72]  seller               (32 bytes)
+      [72:80]  amount_lamports      (8 bytes LE u64)
+      [80:112] artifact_hash        (32 bytes)
+    """
+    if not SOLDERS_AVAILABLE:
+        raise ImportError("Install: pip install solders>=0.21.0 solana>=0.35.0")
+
+    rpc_url        = rpc_url or os.environ.get("SOLANA_RPC_URL", "https://api.devnet.solana.com")
+    program_id_b58 = program_id_b58 or os.environ.get("A2A_CLEARINGHOUSE_PROGRAM_ID")
+    if not program_id_b58:
+        raise ValueError(
+            "A2A_CLEARINGHOUSE_PROGRAM_ID not set. "
+            "Deploy: anchor build && anchor deploy --provider.cluster devnet"
+        )
+
+    buyer_kp            = _load_solana_keypair(buyer_agent_id)
+    buyer_pk            = buyer_kp.pubkey()
+    task_id_bytes       = bytes.fromhex(hashlib.sha256(artifact_id.encode()).hexdigest())
+    artifact_hash_bytes = bytes.fromhex(artifact_hash_hex)
+    program_id          = Pubkey.from_string(program_id_b58)
+    seller_pubkey       = Pubkey.from_string(seller_pubkey_b58)
+    amount_lamps        = int(amount_sol * 1_000_000_000)
+
+    discriminator  = hashlib.sha256(b"global:lock_and_commit").digest()[:8]
+    data           = (discriminator
+                      + task_id_bytes
+                      + bytes(seller_pubkey)
+                      + struct.pack("<Q", amount_lamps)
+                      + artifact_hash_bytes)
+
+    escrow_pda, _  = Pubkey.find_program_address([b"escrow", task_id_bytes], program_id)
+    system_program = Pubkey.from_string("11111111111111111111111111111111")
+
+    accounts = [
+        AccountMeta(pubkey=buyer_pk,       is_signer=True,  is_writable=True),
+        AccountMeta(pubkey=escrow_pda,     is_signer=False, is_writable=True),
+        AccountMeta(pubkey=system_program, is_signer=False, is_writable=False),
+    ]
+    instruction = Instruction(program_id=program_id, accounts=accounts, data=bytes(data))
+
+    sig = _submit_instruction(instruction, buyer_kp, rpc_url)
+    print(f"  [SOLANA] lock_and_commit submitted: {sig}")
+    print(f"  [SOLANA] artifact_hash: {artifact_hash_hex[:16]}...")
     print(f"  [SOLANA] Explorer: https://explorer.solana.com/tx/{sig}?cluster=devnet")
     return sig
 

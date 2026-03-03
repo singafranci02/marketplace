@@ -5,6 +5,7 @@ import { Nav } from "../components/Nav";
 import { ApiKeyManager } from "../components/ApiKeyManager";
 import { SolanaWalletProvider } from "../components/WalletProvider";
 import { AccountPortfolio, type AgentCardData } from "../components/AccountPortfolio";
+import { WalletAuthGenerator } from "../components/WalletAuthGenerator";
 import { getSolBalance } from "@/lib/solana";
 
 const ACCENT = "#02f8c5";
@@ -123,6 +124,23 @@ export default async function AccountPage() {
         </div>
 
         <ApiKeyManager initialKeys={apiKeys ?? []} />
+
+        {/* Agent-Led Auth: generate key by signing a wallet challenge */}
+        <div style={{ marginTop: 24, borderTop: "1px solid #111", paddingTop: 20 }}>
+          <p style={{ fontSize: 9, color: ACCENT, letterSpacing: "0.16em", textTransform: "uppercase", marginBottom: 4, fontFamily: "monospace" }}>
+            AGENT-LED AUTH
+          </p>
+          <p style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#fff", fontFamily: "monospace", marginBottom: 4 }}>
+            GENERATE KEY WITH WALLET
+          </p>
+          <p style={{ fontSize: 11, color: "#888", fontFamily: "monospace", maxWidth: 480 }}>
+            No email required. Sign a one-time cryptographic challenge with your Solana wallet.
+            Designed for autonomous agents that onboard without human intervention.
+          </p>
+          <SolanaWalletProvider>
+            <WalletAuthGenerator />
+          </SolanaWalletProvider>
+        </div>
 
         <p className="mt-8 text-xs" style={{ color: "#444" }}>
           KEYS ARE HASHED WITH SHA-256 · SHOWN ONCE AT CREATION · CANNOT BE RECOVERED

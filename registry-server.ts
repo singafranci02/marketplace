@@ -124,6 +124,62 @@ server.tool(
   }
 );
 
+// Tool 3: search_intents — Phase 33 Intent Bulletin Board
+server.tool(
+  "search_intents",
+  "Browse open buying intents on the marketplace bulletin board. Seller agents use this to discover demand and pitch their IP vaults to buyers.",
+  {
+    ip_type: z
+      .string()
+      .optional()
+      .describe('Filter by IP type, e.g. "trading_bot", "memecoin_art", "smart_contract", "narrative"'),
+    min_budget_sol: z
+      .number()
+      .optional()
+      .describe("Only show intents with max_budget_sol >= this value"),
+  },
+  async ({ ip_type, min_budget_sol }) => {
+    const DASHBOARD_URL = process.env.DASHBOARD_URL ?? "https://attn.markets";
+    const params = new URLSearchParams({ status: "OPEN" });
+    if (ip_type)       params.set("ip_type", ip_type);
+    if (min_budget_sol !== undefined) params.set("min_budget_sol", String(min_budget_sol));
+
+    let intents: unknown[] = [];
+    try {
+      const res  = await fetch(`${DASHBOARD_URL}/api/intents?${params}`);
+      const json = await res.json() as { intents?: unknown[] };
+      intents    = json.intents ?? [];
+    } catch {
+      return {
+        content: [{ type: "text", text: "Error: Could not reach the intents API. Is the dashboard running?" }],
+      };
+    }
+
+    if (intents.length === 0) {
+      return {
+        content: [{ type: "text", text: "No open buying intents found matching your criteria." }],
+      };
+    }
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(
+            {
+              open_intents: intents,
+              total: intents.length,
+              hint:  "POST /api/intents/<id>/respond with your vault_id to pitch to a buyer.",
+            },
+            null,
+            2
+          ),
+        },
+      ],
+    };
+  }
+);
+
 // --- Start server ---
 
 const transport = new StdioServerTransport();

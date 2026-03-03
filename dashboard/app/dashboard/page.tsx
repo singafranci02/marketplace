@@ -22,11 +22,12 @@ export default async function DashboardPage() {
   let licenses: Parameters<typeof TerminalDashboard>[0]["initialLicenses"] = [];
   let vaults: Parameters<typeof TerminalDashboard>[0]["initialVaults"] = [];
   let agents: Parameters<typeof TerminalDashboard>[0]["agents"] = [];
+  let intents: Parameters<typeof TerminalDashboard>[0]["initialIntents"] = [];
 
   if (serviceUrl && serviceKey) {
     const svc = createServiceClient(serviceUrl, serviceKey);
 
-    const [ledgerRes, licenseRes, vaultRes, hbRes, liquidityRes, stakeRes] = await Promise.all([
+    const [ledgerRes, licenseRes, vaultRes, hbRes, liquidityRes, stakeRes, intentsRes] = await Promise.all([
       svc
         .from("ledger")
         .select("artifact, amount_lamports, on_chain_status, tx_hash, artifact_hash")
@@ -45,6 +46,12 @@ export default async function DashboardPage() {
         .eq("on_chain_status", "VERIFIED_ON_CHAIN")
         .not("amount_lamports", "is", null),
       svc.from("agent_stakes").select("agent_id, lamports_staked"),
+      svc
+        .from("buyer_intents")
+        .select("id, buyer_agent_id, ip_type, max_budget_lamports, description, status, created_at")
+        .eq("status", "OPEN")
+        .order("created_at", { ascending: false })
+        .limit(10),
     ]);
 
     // Format deals
@@ -102,6 +109,16 @@ export default async function DashboardPage() {
     const stakeMap: Record<string, number> = {};
     for (const row of stakeRes.data ?? []) stakeMap[row.agent_id] = Number(row.lamports_staked);
 
+    intents = (intentsRes.data ?? []).map((r) => ({
+      id:                  r.id as string,
+      buyer_agent_id:      (r.buyer_agent_id as string | null) ?? "",
+      ip_type:             (r.ip_type as string | null) ?? null,
+      max_budget_lamports: Number(r.max_budget_lamports ?? 0),
+      description:         (r.description as string | null) ?? null,
+      status:              (r.status as string | null) ?? "OPEN",
+      created_at:          (r.created_at as string | null) ?? "",
+    }));
+
     let allAgents: Record<string, unknown>[] = [];
     if (existsSync(DB_PATH)) {
       try { allAgents = JSON.parse(readFileSync(DB_PATH, "utf-8")).agents ?? []; } catch { /* ignore */ }
@@ -149,6 +166,7 @@ export default async function DashboardPage() {
         agents={agents}
         initialLicenses={licenses}
         initialVaults={vaults}
+        initialIntents={intents}
       />
     </>
   );
