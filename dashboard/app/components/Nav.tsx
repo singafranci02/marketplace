@@ -16,7 +16,6 @@ const PUBLIC_LINKS: NavLink[] = [
 
 const APP_LINKS: NavLink[] = [
   { label: "DASHBOARD",     href: "/dashboard" },
-  { label: "LEDGER",        href: "/ledger" },
   { label: "CLEARINGHOUSE", href: "/clearinghouse" },
   { label: "POLICIES",      href: "/policies" },
   { label: "LEARN",         href: "/learn" },
