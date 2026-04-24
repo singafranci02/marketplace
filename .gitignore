@@ -24,6 +24,9 @@ artifacts.json
 .env.local
 .env*.local
 
+# Local MCP config (contains tokens)
+.mcp.json
+
 # OS
 .DS_Store
 Thumbs.db
